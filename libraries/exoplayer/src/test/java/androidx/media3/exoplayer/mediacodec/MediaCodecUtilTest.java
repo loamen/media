@@ -90,12 +90,11 @@ public final class MediaCodecUtilTest {
   @Test
   public void getCodecProfileAndLevel_handlesAv1ProfileMain10HDRWithHdrInfoSet() {
     ColorInfo colorInfo =
-        new ColorInfo.Builder()
-            .setColorSpace(C.COLOR_SPACE_BT709)
-            .setColorRange(C.COLOR_RANGE_LIMITED)
-            .setColorTransfer(C.COLOR_TRANSFER_SDR)
-            .setHdrStaticInfo(new byte[] {1, 2, 3, 4, 5, 6, 7})
-            .build();
+        new ColorInfo(
+            /* colorSpace= */ C.COLOR_SPACE_BT709,
+            /* colorRange= */ C.COLOR_RANGE_LIMITED,
+            /* colorTransfer= */ C.COLOR_TRANSFER_SDR,
+            /* hdrStaticInfo= */ new byte[] {1, 2, 3, 4, 5, 6, 7});
     Format format =
         new Format.Builder()
             .setSampleMimeType(MimeTypes.VIDEO_AV1)
@@ -111,11 +110,11 @@ public final class MediaCodecUtilTest {
   @Test
   public void getCodecProfileAndLevel_handlesAv1ProfileMain10HDRWithoutHdrInfoSet() {
     ColorInfo colorInfo =
-        new ColorInfo.Builder()
-            .setColorSpace(C.COLOR_SPACE_BT709)
-            .setColorRange(C.COLOR_RANGE_LIMITED)
-            .setColorTransfer(C.COLOR_TRANSFER_HLG)
-            .build();
+        new ColorInfo(
+            /* colorSpace= */ C.COLOR_SPACE_BT709,
+            /* colorRange= */ C.COLOR_RANGE_LIMITED,
+            /* colorTransfer= */ C.COLOR_TRANSFER_HLG,
+            /* hdrStaticInfo= */ null);
     Format format =
         new Format.Builder()
             .setSampleMimeType(MimeTypes.VIDEO_AV1)

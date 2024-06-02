@@ -18,6 +18,7 @@ package androidx.media3.common.audio;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.min;
 
+import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.audio.AudioProcessor.AudioFormat;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -26,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -78,14 +80,14 @@ public final class AudioProcessingPipelineTest {
     FakeAudioProcessor fakeSampleRateChangingAudioProcessor =
         new FakeAudioProcessor(/* active= */ true) {
           @Override
-          public AudioFormat onConfigure(AudioFormat inputAudioFormat)
+          public AudioFormat configure(AudioFormat inputAudioFormat)
               throws UnhandledAudioFormatException {
             AudioFormat outputFormat =
                 new AudioFormat(
                     inputAudioFormat.sampleRate * 2,
                     inputAudioFormat.channelCount,
                     inputAudioFormat.encoding);
-            return super.onConfigure(outputFormat);
+            return super.configure(outputFormat);
           }
         };
 
@@ -101,14 +103,14 @@ public final class AudioProcessingPipelineTest {
     FakeAudioProcessor fakeSampleRateChangingAudioProcessor =
         new FakeAudioProcessor(/* active= */ true) {
           @Override
-          public AudioFormat onConfigure(AudioFormat inputAudioFormat)
+          public AudioFormat configure(AudioFormat inputAudioFormat)
               throws UnhandledAudioFormatException {
             AudioFormat outputFormat =
                 new AudioFormat(
                     inputAudioFormat.sampleRate * 2,
                     inputAudioFormat.channelCount,
                     inputAudioFormat.encoding);
-            return super.onConfigure(outputFormat);
+            return super.configure(outputFormat);
           }
         };
 
@@ -144,14 +146,14 @@ public final class AudioProcessingPipelineTest {
     FakeAudioProcessor fakeSampleRateChangingAudioProcessor =
         new FakeAudioProcessor(/* active= */ false) {
           @Override
-          public AudioFormat onConfigure(AudioFormat inputAudioFormat)
+          public AudioFormat configure(AudioFormat inputAudioFormat)
               throws UnhandledAudioFormatException {
             AudioFormat outputFormat =
                 new AudioFormat(
                     inputAudioFormat.sampleRate * 2,
                     inputAudioFormat.channelCount,
                     inputAudioFormat.encoding);
-            return super.onConfigure(outputFormat);
+            return super.configure(outputFormat);
           }
         };
 
@@ -208,7 +210,8 @@ public final class AudioProcessingPipelineTest {
             ImmutableList.of(
                 new FakeAudioProcessor(
                     /* active= */ true, /* maxInputBytesAtOnce= */ 8, /* duplicateBytes= */ true),
-                new FakeAudioProcessor(/* active= */ true),
+                new FakeAudioProcessor(
+                    /* active= */ true, /* maxInputBytesAtOnce= */ 0, /* duplicateBytes= */ false),
                 new FakeAudioProcessor(
                     /* active= */ true, /* maxInputBytesAtOnce= */ 12, /* duplicateBytes= */ true),
                 new FakeAudioProcessor(
@@ -254,20 +257,26 @@ public final class AudioProcessingPipelineTest {
     assertThat(bytesOutput.get(12)).isEqualTo((byte) 0);
   }
 
-  private static class FakeAudioProcessor extends BaseAudioProcessor {
+  // TODO(b/198772621): Consider implementing BaseAudioProcessor once that is in common.
+  private static class FakeAudioProcessor implements AudioProcessor {
+    protected ByteBuffer internalBuffer;
+    private boolean inputEnded;
+    private boolean active;
     private final int maxInputBytesAtOnce;
     private final boolean duplicateBytes;
 
-    private boolean active;
+    private @MonotonicNonNull AudioFormat pendingOutputFormat;
+    private @MonotonicNonNull AudioFormat outputFormat;
 
     public FakeAudioProcessor(boolean active) {
-      this(active, /* maxInputBytesAtOnce= */ Integer.MAX_VALUE, /* duplicateBytes= */ false);
+      this(active, /* maxInputBytesAtOnce= */ 0, /* duplicateBytes= */ false);
     }
 
     public FakeAudioProcessor(boolean active, int maxInputBytesAtOnce, boolean duplicateBytes) {
       this.active = active;
-      this.maxInputBytesAtOnce = maxInputBytesAtOnce <= 0 ? Integer.MAX_VALUE : maxInputBytesAtOnce;
+      this.maxInputBytesAtOnce = maxInputBytesAtOnce;
       this.duplicateBytes = duplicateBytes;
+      internalBuffer = EMPTY_BUFFER;
     }
 
     public void setActive(boolean active) {
@@ -275,13 +284,20 @@ public final class AudioProcessingPipelineTest {
     }
 
     @Override
+    public AudioFormat configure(AudioFormat inputAudioFormat)
+        throws UnhandledAudioFormatException {
+      pendingOutputFormat = inputAudioFormat;
+      return pendingOutputFormat;
+    }
+
+    @Override
     public boolean isActive() {
-      return active && super.isActive();
+      return active && !pendingOutputFormat.equals(AudioFormat.NOT_SET);
     }
 
     @Override
     public void queueInput(ByteBuffer inputBuffer) {
-      if (outputAudioFormat.equals(AudioFormat.NOT_SET)) {
+      if (outputFormat.equals(AudioFormat.NOT_SET)) {
         return;
       }
 
@@ -290,29 +306,63 @@ public final class AudioProcessingPipelineTest {
         return;
       }
 
-      ByteBuffer outputBuffer = replaceOutputBuffer(min(remaining, maxInputBytesAtOnce));
+      internalBuffer =
+          createOrReplaceBuffer(
+              maxInputBytesAtOnce > 0 ? min(remaining, maxInputBytesAtOnce) : remaining,
+              internalBuffer);
 
-      while (outputBuffer.remaining() >= (duplicateBytes ? 2 : 1)) {
+      while (internalBuffer.hasRemaining()) {
         byte b = inputBuffer.get();
-        outputBuffer.put(b);
+        internalBuffer.put(b);
         if (duplicateBytes) {
-          outputBuffer.put(b);
+          internalBuffer.put(b);
         }
       }
 
-      outputBuffer.flip();
+      internalBuffer.flip();
     }
 
     @Override
-    protected AudioFormat onConfigure(AudioFormat inputAudioFormat)
-        throws UnhandledAudioFormatException {
-      return inputAudioFormat;
+    public void queueEndOfStream() {
+      inputEnded = true;
     }
+
+    @Override
+    public ByteBuffer getOutput() {
+      return internalBuffer;
+    }
+
+    @Override
+    public boolean isEnded() {
+      return inputEnded && !internalBuffer.hasRemaining();
+    }
+
+    @Override
+    public void flush() {
+      internalBuffer.clear();
+      internalBuffer = EMPTY_BUFFER;
+      inputEnded = false;
+      outputFormat = pendingOutputFormat;
+    }
+
+    @Override
+    public void reset() {
+      flush();
+    }
+  }
+
+  private static ByteBuffer createOrReplaceBuffer(int size, @Nullable ByteBuffer buffer) {
+    if (buffer == null || buffer.capacity() < size) {
+      buffer = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder());
+    }
+    buffer.clear();
+    return buffer;
   }
 
   /** Creates a one second silence buffer for the given {@link AudioFormat}. */
   private static ByteBuffer createOneSecondDefaultSilenceBuffer(AudioFormat audioFormat) {
-    return ByteBuffer.allocateDirect(audioFormat.sampleRate * audioFormat.bytesPerFrame)
-        .order(ByteOrder.nativeOrder());
+    return createOrReplaceBuffer(
+        /* size= */ audioFormat.sampleRate * audioFormat.channelCount * audioFormat.bytesPerFrame,
+        /* buffer= */ null);
   }
 }

@@ -44,26 +44,20 @@ public abstract class Representation {
    * often a suitable.
    */
   public final long revisionId;
-
   /** The format of the representation. */
   public final Format format;
-
   /** The base URLs of the representation. */
   public final ImmutableList<BaseUrl> baseUrls;
-
   /** The offset of the presentation timestamps in the media stream relative to media time. */
   public final long presentationTimeOffsetUs;
-
   /** The in-band event streams in the representation. May be empty. */
   public final List<Descriptor> inbandEventStreams;
-
   /** Essential properties in the representation. May be empty. */
   public final List<Descriptor> essentialProperties;
-
   /** Supplemental properties in the adaptation set. May be empty. */
   public final List<Descriptor> supplementalProperties;
 
-  @Nullable private final RangedUri initializationUri;
+  private final RangedUri initializationUri;
 
   /**
    * Constructs a new instance.
@@ -187,7 +181,6 @@ public abstract class Representation {
 
     /** The uri of the single segment. */
     public final Uri uri;
-
     /** The content length, or {@link C#LENGTH_UNSET} if unknown. */
     public final long contentLength;
 

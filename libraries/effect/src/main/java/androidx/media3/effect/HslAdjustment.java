@@ -26,7 +26,7 @@ import com.google.errorprone.annotations.CanIgnoreReturnValue;
 
 /** Adjusts the HSL (Hue, Saturation, and Lightness) of a frame. */
 @UnstableApi
-public final class HslAdjustment implements GlEffect {
+public class HslAdjustment implements GlEffect {
 
   /** A builder for {@code HslAdjustment} instances. */
   public static final class Builder {
@@ -101,10 +101,8 @@ public final class HslAdjustment implements GlEffect {
 
   /** Indicates the hue adjustment in degrees. */
   public final float hueAdjustmentDegrees;
-
   /** Indicates the saturation adjustment. */
   public final float saturationAdjustment;
-
   /** Indicates the lightness adjustment. */
   public final float lightnessAdjustment;
 
@@ -116,7 +114,7 @@ public final class HslAdjustment implements GlEffect {
   }
 
   @Override
-  public BaseGlShaderProgram toGlShaderProgram(Context context, boolean useHdr)
+  public SingleFrameGlShaderProgram toGlShaderProgram(Context context, boolean useHdr)
       throws VideoFrameProcessingException {
     return new HslShaderProgram(context, /* hslAdjustment= */ this, useHdr);
   }

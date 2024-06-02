@@ -15,8 +15,6 @@ apply from: '../../constants.gradle'
 apply plugin: 'com.android.application'
 
 android {
-    namespace 'androidx.media3.demo.surface'
-
     compileSdkVersion project.ext.compileSdkVersion
 
     compileOptions {

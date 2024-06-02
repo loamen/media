@@ -20,7 +20,6 @@ import static org.junit.Assert.assertThrows;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
 import android.net.Uri;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.test.utils.TestUtil;
@@ -53,9 +52,7 @@ public class DataSourceBitmapLoaderTest {
 
   @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
-  private static final String TEST_IMAGE_FOLDER = "media/jpeg/";
-  private static final String TEST_IMAGE_PATH =
-      TEST_IMAGE_FOLDER + "non-motion-photo-shortened-no-exif.jpg";
+  private static final String TEST_IMAGE_PATH = "media/jpeg/non-motion-photo-shortened.jpg";
 
   private DataSource.Factory dataSourceFactory;
 
@@ -80,33 +77,6 @@ public class DataSourceBitmapLoaderTest {
   }
 
   @Test
-  public void decodeBitmap_withExifRotation_loadsCorrectData() throws Exception {
-    DataSourceBitmapLoader bitmapLoader =
-        new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
-    byte[] imageData =
-        TestUtil.getByteArray(
-            ApplicationProvider.getApplicationContext(),
-            TEST_IMAGE_FOLDER + "non-motion-photo-shortened.jpg");
-    Bitmap bitmapWithoutRotation =
-        BitmapFactory.decodeByteArray(imageData, /* offset= */ 0, imageData.length);
-    Matrix rotationMatrix = new Matrix();
-    rotationMatrix.postRotate(/* degrees= */ 90);
-    Bitmap expectedBitmap =
-        Bitmap.createBitmap(
-            bitmapWithoutRotation,
-            /* x= */ 0,
-            /* y= */ 0,
-            bitmapWithoutRotation.getWidth(),
-            bitmapWithoutRotation.getHeight(),
-            rotationMatrix,
-            /* filter= */ false);
-
-    Bitmap actualBitmap = bitmapLoader.decodeBitmap(imageData).get();
-
-    assertThat(actualBitmap.sameAs(expectedBitmap)).isTrue();
-  }
-
-  @Test
   public void decodeBitmap_withInvalidData_throws() {
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
@@ -123,15 +93,14 @@ public class DataSourceBitmapLoaderTest {
   public void loadBitmap_withHttpUri_loadsCorrectData() throws Exception {
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
+    MockWebServer mockWebServer = new MockWebServer();
     byte[] imageData =
         TestUtil.getByteArray(ApplicationProvider.getApplicationContext(), TEST_IMAGE_PATH);
     Buffer responseBody = new Buffer().write(imageData);
-    Bitmap bitmap;
-    try (MockWebServer mockWebServer = new MockWebServer()) {
-      mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(responseBody));
+    mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(responseBody));
 
-      bitmap = bitmapLoader.loadBitmap(Uri.parse(mockWebServer.url("test_path").toString())).get();
-    }
+    Bitmap bitmap =
+        bitmapLoader.loadBitmap(Uri.parse(mockWebServer.url("test_path").toString())).get();
 
     assertThat(
             bitmap.sameAs(
@@ -140,15 +109,14 @@ public class DataSourceBitmapLoaderTest {
   }
 
   @Test
-  public void loadBitmap_httpUriAndServerError_throws() throws Exception {
+  public void loadBitmap_httpUriAndServerError_throws() {
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
-    ListenableFuture<Bitmap> future;
-    try (MockWebServer mockWebServer = new MockWebServer()) {
-      mockWebServer.enqueue(new MockResponse().setResponseCode(404));
+    MockWebServer mockWebServer = new MockWebServer();
+    mockWebServer.enqueue(new MockResponse().setResponseCode(404));
 
-      future = bitmapLoader.loadBitmap(Uri.parse(mockWebServer.url("test_path").toString()));
-    }
+    ListenableFuture<Bitmap> future =
+        bitmapLoader.loadBitmap(Uri.parse(mockWebServer.url("test_path").toString()));
 
     assertException(
         future::get, HttpDataSource.InvalidResponseCodeException.class, /* messagePart= */ "404");
@@ -170,7 +138,7 @@ public class DataSourceBitmapLoaderTest {
   }
 
   @Test
-  public void loadBitmap_assetUriWithAssetNotExisting_throws() {
+  public void loadBitmap_assetUriWithAssetNotExisting_throws() throws Exception {
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
 
@@ -199,25 +167,7 @@ public class DataSourceBitmapLoaderTest {
   }
 
   @Test
-  public void loadBitmap_withFileUriAndOptions_loadsDataWithRespectToOptions() throws Exception {
-    byte[] imageData =
-        TestUtil.getByteArray(ApplicationProvider.getApplicationContext(), TEST_IMAGE_PATH);
-    File file = tempFolder.newFile();
-    Files.write(Paths.get(file.getAbsolutePath()), imageData);
-    Uri uri = Uri.fromFile(file);
-    DataSourceBitmapLoader bitmapLoader =
-        new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
-
-    BitmapFactory.Options options = new BitmapFactory.Options();
-    options.inMutable = true;
-
-    Bitmap bitmap = bitmapLoader.loadBitmap(uri, options).get();
-
-    assertThat(bitmap.isMutable()).isTrue();
-  }
-
-  @Test
-  public void loadBitmap_fileUriWithFileNotExisting_throws() {
+  public void loadBitmap_fileUriWithFileNotExisting_throws() throws Exception {
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
 
@@ -232,50 +182,49 @@ public class DataSourceBitmapLoaderTest {
       throws Exception {
     byte[] imageData =
         TestUtil.getByteArray(ApplicationProvider.getApplicationContext(), TEST_IMAGE_PATH);
+    MockWebServer mockWebServer = new MockWebServer();
+    Uri uri = Uri.parse(mockWebServer.url("test_path").toString());
+    MediaMetadata metadata =
+        new MediaMetadata.Builder()
+            .setArtworkData(imageData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            .setArtworkUri(uri)
+            .build();
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
-    try (MockWebServer mockWebServer = new MockWebServer()) {
-      Uri uri = Uri.parse(mockWebServer.url("test_path").toString());
-      MediaMetadata metadata =
-          new MediaMetadata.Builder()
-              .setArtworkData(imageData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-              .setArtworkUri(uri)
-              .build();
 
-      Bitmap bitmap = bitmapLoader.loadBitmapFromMetadata(metadata).get();
+    Bitmap bitmap = bitmapLoader.loadBitmapFromMetadata(metadata).get();
 
-      assertThat(
-              bitmap.sameAs(
-                  BitmapFactory.decodeByteArray(imageData, /* offset= */ 0, imageData.length)))
-          .isTrue();
-      assertThat(mockWebServer.getRequestCount()).isEqualTo(0);
-    }
+    assertThat(
+            bitmap.sameAs(
+                BitmapFactory.decodeByteArray(imageData, /* offset= */ 0, imageData.length)))
+        .isTrue();
+    assertThat(mockWebServer.getRequestCount()).isEqualTo(0);
   }
 
   @Test
   public void loadBitmapFromMetadata_withArtworkUriSet_loadFromArtworkUri() throws Exception {
     byte[] imageData =
         TestUtil.getByteArray(ApplicationProvider.getApplicationContext(), TEST_IMAGE_PATH);
+    MockWebServer mockWebServer = new MockWebServer();
     Buffer responseBody = new Buffer().write(imageData);
+    mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(responseBody));
+    Uri uri = Uri.parse(mockWebServer.url("test_path").toString());
+    MediaMetadata metadata = new MediaMetadata.Builder().setArtworkUri(uri).build();
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);
-    try (MockWebServer mockWebServer = new MockWebServer()) {
-      mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody(responseBody));
-      Uri uri = Uri.parse(mockWebServer.url("test_path").toString());
-      MediaMetadata metadata = new MediaMetadata.Builder().setArtworkUri(uri).build();
 
-      Bitmap bitmap = bitmapLoader.loadBitmapFromMetadata(metadata).get();
+    Bitmap bitmap = bitmapLoader.loadBitmapFromMetadata(metadata).get();
 
-      assertThat(
-              bitmap.sameAs(
-                  BitmapFactory.decodeByteArray(imageData, /* offset= */ 0, imageData.length)))
-          .isTrue();
-      assertThat(mockWebServer.getRequestCount()).isEqualTo(1);
-    }
+    assertThat(
+            bitmap.sameAs(
+                BitmapFactory.decodeByteArray(imageData, /* offset= */ 0, imageData.length)))
+        .isTrue();
+    assertThat(mockWebServer.getRequestCount()).isEqualTo(1);
   }
 
   @Test
-  public void loadBitmapFromMetadata_withArtworkDataAndArtworkUriUnset_returnNull() {
+  public void loadBitmapFromMetadata_withArtworkDataAndArtworkUriUnset_returnNull()
+      throws Exception {
     MediaMetadata metadata = new MediaMetadata.Builder().build();
     DataSourceBitmapLoader bitmapLoader =
         new DataSourceBitmapLoader(MoreExecutors.newDirectExecutorService(), dataSourceFactory);

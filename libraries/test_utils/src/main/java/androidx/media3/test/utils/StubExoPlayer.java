@@ -398,7 +398,12 @@ public class StubExoPlayer extends StubPlayer implements ExoPlayer {
   }
 
   @Override
-  public boolean isSleepingForOffload() {
+  public void experimentalSetOffloadSchedulingEnabled(boolean offloadSchedulingEnabled) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean experimentalIsSleepingForOffload() {
     throw new UnsupportedOperationException();
   }
 

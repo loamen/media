@@ -20,8 +20,6 @@ import static android.support.v4.media.MediaMetadataCompat.METADATA_KEY_MEDIA_ID
 import static android.support.v4.media.MediaMetadataCompat.METADATA_KEY_USER_RATING;
 import static androidx.media3.common.Player.STATE_ENDED;
 import static androidx.media3.common.Player.STATE_READY;
-import static androidx.media3.test.session.common.MediaSessionConstants.TEST_MEDIA_CONTROLLER_COMPAT_CALLBACK_WITH_MEDIA_SESSION_TEST;
-import static androidx.media3.test.session.common.MediaSessionConstants.TEST_SET_SHOW_PLAY_BUTTON_IF_SUPPRESSED_TO_FALSE;
 import static androidx.media3.test.session.common.TestUtils.LONG_TIMEOUT_MS;
 import static androidx.media3.test.session.common.TestUtils.TIMEOUT_MS;
 import static com.google.common.truth.Truth.assertThat;
@@ -79,10 +77,10 @@ import org.junit.runner.RunWith;
 @LargeTest
 public class MediaControllerCompatCallbackWithMediaSessionTest {
 
-  private static final String SESSION_ID =
-      TEST_MEDIA_CONTROLLER_COMPAT_CALLBACK_WITH_MEDIA_SESSION_TEST;
+  private static final String TAG = "MCCCallbackTestWithMS2";
+  private static final float EPSILON = 1e-6f;
 
-  @Rule public final HandlerThreadTestRule threadTestRule = new HandlerThreadTestRule(SESSION_ID);
+  @Rule public final HandlerThreadTestRule threadTestRule = new HandlerThreadTestRule(TAG);
 
   private Context context;
   private TestHandler handler;
@@ -93,10 +91,7 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
   public void setUp() throws Exception {
     context = ApplicationProvider.getApplicationContext();
     handler = threadTestRule.getHandler();
-    Bundle tokenExtras = new Bundle();
-    tokenExtras.putBoolean(
-        MediaSessionProviderService.KEY_ENABLE_FAKE_MEDIA_NOTIFICATION_MANAGER_CONTROLLER, true);
-    session = new RemoteMediaSession(SESSION_ID, context, tokenExtras);
+    session = new RemoteMediaSession(TAG, context, null);
     controllerCompat = new MediaControllerCompat(context, session.getCompatToken());
   }
 
@@ -185,7 +180,7 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
   public void getError_withPlayerErrorAfterConnected_returnsError() throws Exception {
     PlaybackException testPlayerError =
         new PlaybackException(
-            /* message= */ "testremote",
+            /* messaage= */ "testremote",
             /* cause= */ null,
             PlaybackException.ERROR_CODE_REMOTE_ERROR);
     Bundle playerConfig =
@@ -211,7 +206,7 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
   public void playerError_notified() throws Exception {
     PlaybackException testPlayerError =
         new PlaybackException(
-            /* message= */ "player error",
+            /* messaage= */ "player error",
             /* cause= */ null,
             PlaybackException.ERROR_CODE_UNSPECIFIED);
 
@@ -673,6 +668,12 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
                 .getExtras()
                 .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
         .isEqualTo(1f);
+    assertThat(
+            playbackStateCompatRef
+                .get()
+                .getExtras()
+                .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
+        .isEqualTo(1f);
     assertThat(controllerCompat.getPlaybackState().getState())
         .isEqualTo(PlaybackStateCompat.STATE_PAUSED);
     assertThat(controllerCompat.getPlaybackState().getPlaybackSpeed()).isEqualTo(0f);
@@ -712,6 +713,12 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
     assertThat(playbackStateCompatRef.get().getState())
         .isEqualTo(PlaybackStateCompat.STATE_BUFFERING);
     assertThat(playbackStateCompatRef.get().getPlaybackSpeed()).isEqualTo(0f);
+    assertThat(
+            playbackStateCompatRef
+                .get()
+                .getExtras()
+                .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
+        .isEqualTo(1f);
     assertThat(
             playbackStateCompatRef
                 .get()
@@ -759,6 +766,12 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
                 .getExtras()
                 .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
         .isEqualTo(1f);
+    assertThat(
+            playbackStateCompatRef
+                .get()
+                .getExtras()
+                .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
+        .isEqualTo(1f);
     assertThat(controllerCompat.getPlaybackState().getState())
         .isEqualTo(PlaybackStateCompat.STATE_STOPPED);
     assertThat(controllerCompat.getPlaybackState().getPlaybackSpeed()).isEqualTo(0f);
@@ -771,57 +784,8 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
   }
 
   @Test
-  public void playbackStateChange_withPlaybackSuppression_notifiesPaused() throws Exception {
-    session.getMockPlayer().setPlaybackState(Player.STATE_READY);
-    session
-        .getMockPlayer()
-        .setPlayWhenReady(/* playWhenReady= */ true, Player.PLAYBACK_SUPPRESSION_REASON_NONE);
-    AtomicReference<PlaybackStateCompat> playbackStateCompatRef = new AtomicReference<>();
-    CountDownLatch latch = new CountDownLatch(1);
-    MediaControllerCompat.Callback callback =
-        new MediaControllerCompat.Callback() {
-          @Override
-          public void onPlaybackStateChanged(PlaybackStateCompat playbackStateCompat) {
-            playbackStateCompatRef.set(playbackStateCompat);
-            latch.countDown();
-          }
-        };
-    controllerCompat.registerCallback(callback, handler);
-
-    session
-        .getMockPlayer()
-        .notifyPlayWhenReadyChanged(
-            /* playWhenReady= */ true,
-            Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS);
-
-    assertThat(latch.await(TIMEOUT_MS, MILLISECONDS)).isTrue();
-    assertThat(playbackStateCompatRef.get().getState()).isEqualTo(PlaybackStateCompat.STATE_PAUSED);
-    assertThat(playbackStateCompatRef.get().getPlaybackSpeed()).isEqualTo(0f);
-    assertThat(
-            playbackStateCompatRef
-                .get()
-                .getExtras()
-                .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
-        .isEqualTo(1f);
-    assertThat(controllerCompat.getPlaybackState().getState())
-        .isEqualTo(PlaybackStateCompat.STATE_PAUSED);
-    assertThat(controllerCompat.getPlaybackState().getPlaybackSpeed()).isEqualTo(0f);
-    assertThat(
-            controllerCompat
-                .getPlaybackState()
-                .getExtras()
-                .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
-        .isEqualTo(1f);
-  }
-
-  @Test
-  public void
-      playbackStateChange_withPlaybackSuppressionWithoutShowPauseIfSuppressed_notifiesPlayingWithSpeedZero()
-          throws Exception {
-    RemoteMediaSession session =
-        new RemoteMediaSession(TEST_SET_SHOW_PLAY_BUTTON_IF_SUPPRESSED_TO_FALSE, context, null);
-    MediaControllerCompat controllerCompat =
-        new MediaControllerCompat(context, session.getCompatToken());
+  public void playbackStateChange_withPlaybackSuppression_notifiesPlayingWithSpeedZero()
+      throws Exception {
     session.getMockPlayer().setPlaybackState(Player.STATE_READY);
     session
         .getMockPlayer()
@@ -854,6 +818,12 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
                 .getExtras()
                 .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
         .isEqualTo(1f);
+    assertThat(
+            playbackStateCompatRef
+                .get()
+                .getExtras()
+                .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
+        .isEqualTo(1f);
     assertThat(controllerCompat.getPlaybackState().getState())
         .isEqualTo(PlaybackStateCompat.STATE_PLAYING);
     assertThat(controllerCompat.getPlaybackState().getPlaybackSpeed()).isEqualTo(0f);
@@ -863,7 +833,6 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
                 .getExtras()
                 .getFloat(MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT))
         .isEqualTo(1f);
-    session.release();
   }
 
   @Test
@@ -941,46 +910,53 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
 
   @Test
   public void setCustomLayout_onPlaybackStateCompatChangedCalled() throws Exception {
+    List<CommandButton> buttons = new ArrayList<>();
     Bundle extras1 = new Bundle();
     extras1.putString("key", "value-1");
-    SessionCommand command1 = new SessionCommand("command1", extras1);
+    CommandButton button1 =
+        new CommandButton.Builder()
+            .setSessionCommand(new SessionCommand("action1", extras1))
+            .setDisplayName("actionName1")
+            .setIconResId(1)
+            .build();
     Bundle extras2 = new Bundle();
     extras2.putString("key", "value-2");
-    SessionCommand command2 = new SessionCommand("command2", extras2);
-    ImmutableList<CommandButton> customLayout =
-        ImmutableList.of(
-            new CommandButton.Builder()
-                .setSessionCommand(command1)
-                .setDisplayName("command1")
-                .setIconResId(1)
-                .build()
-                .copyWithIsEnabled(true),
-            new CommandButton.Builder()
-                .setSessionCommand(command2)
-                .setDisplayName("command2")
-                .setIconResId(2)
-                .build()
-                .copyWithIsEnabled(true));
-    List<ImmutableList<CommandButton>> reportedCustomLayouts = new ArrayList<>();
-    CountDownLatch latch1 = new CountDownLatch(2);
+    CommandButton button2 =
+        new CommandButton.Builder()
+            .setSessionCommand(new SessionCommand("action2", extras2))
+            .setDisplayName("actionName2")
+            .setIconResId(2)
+            .build();
+    buttons.add(button1);
+    buttons.add(button2);
+    List<String> receivedActions = new ArrayList<>();
+    List<String> receivedDisplayNames = new ArrayList<>();
+    List<String> receivedBundleValues = new ArrayList<>();
+    List<Integer> receivedIconResIds = new ArrayList<>();
+    CountDownLatch latch = new CountDownLatch(1);
     MediaControllerCompat.Callback callback =
         new MediaControllerCompat.Callback() {
           @Override
           public void onPlaybackStateChanged(PlaybackStateCompat state) {
-            reportedCustomLayouts.add(MediaUtils.convertToCustomLayout(state));
-            latch1.countDown();
+            List<PlaybackStateCompat.CustomAction> layout = state.getCustomActions();
+            for (PlaybackStateCompat.CustomAction action : layout) {
+              receivedActions.add(action.getAction());
+              receivedDisplayNames.add(String.valueOf(action.getName()));
+              receivedBundleValues.add(action.getExtras().getString("key"));
+              receivedIconResIds.add(action.getIcon());
+            }
+            latch.countDown();
           }
         };
     controllerCompat.registerCallback(callback, handler);
 
-    session.setCustomLayout(customLayout);
-    session.setAvailableCommands(
-        SessionCommands.EMPTY.buildUpon().add(command1).add(command2).build(),
-        Player.Commands.EMPTY);
+    session.setCustomLayout(buttons);
 
-    assertThat(latch1.await(TIMEOUT_MS, MILLISECONDS)).isTrue();
-    assertThat(reportedCustomLayouts.get(0)).containsExactly(customLayout.get(0));
-    assertThat(reportedCustomLayouts.get(1)).isEqualTo(customLayout);
+    assertThat(latch.await(TIMEOUT_MS, MILLISECONDS)).isTrue();
+    assertThat(receivedActions).containsExactly("action1", "action2").inOrder();
+    assertThat(receivedDisplayNames).containsExactly("actionName1", "actionName2").inOrder();
+    assertThat(receivedIconResIds).containsExactly(1, 2).inOrder();
+    assertThat(receivedBundleValues).containsExactly("value-1", "value-2").inOrder();
   }
 
   @Test
@@ -1400,6 +1376,6 @@ public class MediaControllerCompatCallbackWithMediaSessionTest {
       PlaybackStateCompat state, PlaybackException playerError) {
     assertThat(state.getState()).isEqualTo(PlaybackStateCompat.STATE_ERROR);
     assertThat(state.getErrorCode()).isEqualTo(PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR);
-    assertThat(state.getErrorMessage().toString()).isEqualTo(playerError.getMessage());
+    assertThat(state.getErrorMessage()).isEqualTo(playerError.getMessage());
   }
 }

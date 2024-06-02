@@ -16,6 +16,7 @@
 package androidx.media3.exoplayer.dash;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.fail;
 
 import android.net.Uri;
@@ -23,7 +24,6 @@ import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaItem.LiveConfiguration;
 import androidx.media3.common.ParserException;
-import androidx.media3.common.StreamKey;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.Timeline.Window;
 import androidx.media3.common.util.Util;
@@ -32,17 +32,18 @@ import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.FileDataSource;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.exoplayer.source.MediaSource.MediaSourceCaller;
 import androidx.media3.exoplayer.upstream.ParsingLoadable;
 import androidx.media3.test.utils.TestUtil;
-import androidx.media3.test.utils.robolectric.RobolectricUtil;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.shadows.ShadowLooper;
 
 /** Unit test for {@link DashMediaSource}. */
 @RunWith(AndroidJUnit4.class)
@@ -141,7 +142,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_withoutLiveConfiguration_withoutMediaItemLiveConfiguration_usesUnitSpeed()
-      throws Exception {
+      throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
@@ -160,7 +161,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_withoutLiveConfiguration_withOnlyMediaItemTargetOffset_usesUnitSpeed()
-      throws Exception {
+      throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
@@ -183,7 +184,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_withoutLiveConfiguration_withMediaItemSpeedLimits_usesDefaultFallbackValues()
-      throws Exception {
+      throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
@@ -208,7 +209,7 @@ public final class DashMediaSourceTest {
   @Test
   public void
       prepare_withoutLiveConfiguration_withoutMediaItemTargetOffset_usesDefinedFallbackTargetOffset()
-          throws Exception {
+          throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
@@ -232,7 +233,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_withoutLiveConfiguration_withMediaItemLiveProperties_usesMediaItem()
-      throws Exception {
+      throws InterruptedException {
     MediaItem mediaItem =
         new MediaItem.Builder()
             .setUri(Uri.EMPTY)
@@ -259,7 +260,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_withSuggestedPresentationDelayAndMinBufferTime_usesManifestValue()
-      throws Exception {
+      throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () ->
@@ -286,7 +287,7 @@ public final class DashMediaSourceTest {
   @Test
   public void
       prepare_withSuggestedPresentationDelayAndMinBufferTime_withMediaItemLiveProperties_usesMediaItem()
-          throws Exception {
+          throws InterruptedException {
     MediaItem mediaItem =
         new MediaItem.Builder()
             .setUri(Uri.EMPTY)
@@ -318,7 +319,8 @@ public final class DashMediaSourceTest {
   }
 
   @Test
-  public void prepare_withCompleteServiceDescription_usesManifestValue() throws Exception {
+  public void prepare_withCompleteServiceDescription_usesManifestValue()
+      throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITH_COMPLETE_SERVICE_DESCRIPTION))
@@ -337,7 +339,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_withCompleteServiceDescription_withMediaItemLiveProperties_usesMediaItem()
-      throws Exception {
+      throws InterruptedException {
     MediaItem mediaItem =
         new MediaItem.Builder()
             .setUri(Uri.EMPTY)
@@ -395,7 +397,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_targetLiveOffsetInWindow_manifestTargetOffsetAndAlignedWindowStartPosition()
-      throws Exception {
+      throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITH_OFFSET_INSIDE_WINDOW))
@@ -411,7 +413,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_targetLiveOffsetTooLong_correctedTargetOffsetAndAlignedWindowStartPosition()
-      throws Exception {
+      throws InterruptedException {
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
                 () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITH_OFFSET_TOO_LONG))
@@ -427,7 +429,7 @@ public final class DashMediaSourceTest {
 
   @Test
   public void prepare_targetLiveOffsetTooShort_correctedTargetOffsetAndAlignedWindowStartPosition()
-      throws Exception {
+      throws InterruptedException {
     // Load manifest with now time far behind the start of the window.
     DashMediaSource mediaSource =
         new DashMediaSource.Factory(
@@ -442,156 +444,21 @@ public final class DashMediaSourceTest {
     assertThat(window.liveConfiguration.targetOffsetMs).isEqualTo(60_000 - 16_000);
   }
 
-  @Test
-  public void canUpdateMediaItem_withIrrelevantFieldsChanged_returnsTrue() {
-    MediaItem initialMediaItem =
-        new MediaItem.Builder()
-            .setUri("http://test.test")
-            .setStreamKeys(
-                ImmutableList.of(new StreamKey(/* groupIndex= */ 1, /* streamIndex= */ 0)))
-            .setDrmConfiguration(new MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID).build())
-            .setLiveConfiguration(new LiveConfiguration.Builder().setTargetOffsetMs(2000).build())
-            .build();
-    MediaItem updatedMediaItem =
-        TestUtil.buildFullyCustomizedMediaItem()
-            .buildUpon()
-            .setUri("http://test.test")
-            .setStreamKeys(
-                ImmutableList.of(new StreamKey(/* groupIndex= */ 1, /* streamIndex= */ 0)))
-            .setDrmConfiguration(new MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID).build())
-            .setLiveConfiguration(new LiveConfiguration.Builder().setTargetOffsetMs(2000).build())
-            .build();
-    MediaSource mediaSource =
-        new DashMediaSource.Factory(
-                () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
-            .createMediaSource(initialMediaItem);
-
-    boolean canUpdateMediaItem = mediaSource.canUpdateMediaItem(updatedMediaItem);
-
-    assertThat(canUpdateMediaItem).isTrue();
-  }
-
-  @Test
-  public void canUpdateMediaItem_withNullLocalConfiguration_returnsFalse() {
-    MediaItem initialMediaItem = new MediaItem.Builder().setUri("http://test.test").build();
-    MediaItem updatedMediaItem = new MediaItem.Builder().setMediaId("id").build();
-    MediaSource mediaSource =
-        new DashMediaSource.Factory(
-                () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
-            .createMediaSource(initialMediaItem);
-
-    boolean canUpdateMediaItem = mediaSource.canUpdateMediaItem(updatedMediaItem);
-
-    assertThat(canUpdateMediaItem).isFalse();
-  }
-
-  @Test
-  public void canUpdateMediaItem_withChangedUri_returnsFalse() {
-    MediaItem initialMediaItem = new MediaItem.Builder().setUri("http://test.test").build();
-    MediaItem updatedMediaItem = new MediaItem.Builder().setUri("http://test2.test").build();
-    MediaSource mediaSource =
-        new DashMediaSource.Factory(
-                () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
-            .createMediaSource(initialMediaItem);
-
-    boolean canUpdateMediaItem = mediaSource.canUpdateMediaItem(updatedMediaItem);
-
-    assertThat(canUpdateMediaItem).isFalse();
-  }
-
-  @Test
-  public void canUpdateMediaItem_withChangedStreamKeys_returnsFalse() {
-    MediaItem initialMediaItem =
-        new MediaItem.Builder()
-            .setUri("http://test.test")
-            .setStreamKeys(
-                ImmutableList.of(new StreamKey(/* groupIndex= */ 1, /* streamIndex= */ 0)))
-            .build();
-    MediaItem updatedMediaItem =
-        new MediaItem.Builder()
-            .setUri("http://test.test")
-            .setStreamKeys(
-                ImmutableList.of(new StreamKey(/* groupIndex= */ 2, /* streamIndex= */ 2)))
-            .build();
-    MediaSource mediaSource =
-        new DashMediaSource.Factory(
-                () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
-            .createMediaSource(initialMediaItem);
-
-    boolean canUpdateMediaItem = mediaSource.canUpdateMediaItem(updatedMediaItem);
-
-    assertThat(canUpdateMediaItem).isFalse();
-  }
-
-  @Test
-  public void canUpdateMediaItem_withChangedDrmConfiguration_returnsFalse() {
-    MediaItem initialMediaItem =
-        new MediaItem.Builder()
-            .setUri("http://test.test")
-            .setDrmConfiguration(new MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID).build())
-            .build();
-    MediaItem updatedMediaItem =
-        new MediaItem.Builder()
-            .setUri("http://test.test")
-            .setDrmConfiguration(new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID).build())
-            .build();
-    MediaSource mediaSource =
-        new DashMediaSource.Factory(
-                () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
-            .createMediaSource(initialMediaItem);
-
-    boolean canUpdateMediaItem = mediaSource.canUpdateMediaItem(updatedMediaItem);
-
-    assertThat(canUpdateMediaItem).isFalse();
-  }
-
-  @Test
-  public void canUpdateMediaItem_withChangedLiveConfiguration_returnsFalse() {
-    MediaItem initialMediaItem =
-        new MediaItem.Builder()
-            .setUri("http://test.test")
-            .setLiveConfiguration(new LiveConfiguration.Builder().setTargetOffsetMs(2000).build())
-            .build();
-    MediaItem updatedMediaItem =
-        new MediaItem.Builder()
-            .setUri("http://test.test")
-            .setLiveConfiguration(new LiveConfiguration.Builder().setTargetOffsetMs(5000).build())
-            .build();
-    MediaSource mediaSource =
-        new DashMediaSource.Factory(
-                () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
-            .createMediaSource(initialMediaItem);
-
-    boolean canUpdateMediaItem = mediaSource.canUpdateMediaItem(updatedMediaItem);
-
-    assertThat(canUpdateMediaItem).isFalse();
-  }
-
-  @Test
-  public void updateMediaItem_createsTimelineWithUpdatedItem() throws Exception {
-    MediaItem initialMediaItem =
-        new MediaItem.Builder().setUri("http://test.test").setTag("tag1").build();
-    MediaItem updatedMediaItem =
-        new MediaItem.Builder().setUri("http://test.test").setTag("tag2").build();
-    MediaSource mediaSource =
-        new DashMediaSource.Factory(
-                () -> createSampleMpdDataSource(SAMPLE_MPD_LIVE_WITHOUT_LIVE_CONFIGURATION))
-            .createMediaSource(initialMediaItem);
-
-    mediaSource.updateMediaItem(updatedMediaItem);
-    Timeline.Window window = prepareAndWaitForTimelineRefresh(mediaSource);
-
-    assertThat(window.mediaItem).isEqualTo(updatedMediaItem);
-  }
-
-  private static Window prepareAndWaitForTimelineRefresh(MediaSource mediaSource) throws Exception {
-    AtomicReference<Timeline.Window> windowReference = new AtomicReference<>();
-    mediaSource.prepareSource(
-        (source, timeline) ->
-            windowReference.set(timeline.getWindow(/* windowIndex= */ 0, new Timeline.Window())),
-        /* mediaTransferListener= */ null,
-        PlayerId.UNSET);
-    RobolectricUtil.runMainLooperUntil(() -> windowReference.get() != null);
+  private static Window prepareAndWaitForTimelineRefresh(MediaSource mediaSource)
+      throws InterruptedException {
+    AtomicReference<Window> windowReference = new AtomicReference<>();
+    CountDownLatch countDownLatch = new CountDownLatch(/* count= */ 1);
+    MediaSourceCaller caller =
+        (MediaSource source, Timeline timeline) -> {
+          if (windowReference.get() == null) {
+            windowReference.set(timeline.getWindow(0, new Timeline.Window()));
+            countDownLatch.countDown();
+          }
+        };
+    mediaSource.prepareSource(caller, /* mediaTransferListener= */ null, PlayerId.UNSET);
+    while (!countDownLatch.await(/* timeout= */ 10, MILLISECONDS)) {
+      ShadowLooper.idleMainLooper();
+    }
     return windowReference.get();
   }
 

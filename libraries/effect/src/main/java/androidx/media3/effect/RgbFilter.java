@@ -25,7 +25,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Provides common color filters. */
 @UnstableApi
-public final class RgbFilter implements RgbMatrix {
+public class RgbFilter implements RgbMatrix {
   private static final int COLOR_FILTER_GRAYSCALE_INDEX = 1;
   private static final int COLOR_FILTER_INVERTED_INDEX = 2;
 
@@ -48,7 +48,6 @@ public final class RgbFilter implements RgbMatrix {
   };
 
   private final int colorFilter;
-
   /**
    * Ensures that the usage of HDR is consistent. {@code null} indicates that HDR has not yet been
    * set.
@@ -92,7 +91,7 @@ public final class RgbFilter implements RgbMatrix {
   }
 
   @Override
-  public BaseGlShaderProgram toGlShaderProgram(Context context, boolean useHdr)
+  public SingleFrameGlShaderProgram toGlShaderProgram(Context context, boolean useHdr)
       throws VideoFrameProcessingException {
     checkForConsistentHdrSetting(useHdr);
     return RgbMatrix.super.toGlShaderProgram(context, useHdr);

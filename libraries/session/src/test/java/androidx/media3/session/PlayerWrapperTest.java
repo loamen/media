@@ -22,7 +22,6 @@ import static org.mockito.Mockito.when;
 import android.os.Looper;
 import androidx.media3.common.Player;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import com.google.common.collect.ImmutableList;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -43,13 +42,7 @@ public class PlayerWrapperTest {
 
   @Before
   public void setUp() {
-    playerWrapper =
-        new PlayerWrapper(
-            player,
-            /* playIfSuppressed= */ true,
-            ImmutableList.of(),
-            SessionCommands.EMPTY,
-            Player.Commands.EMPTY);
+    playerWrapper = new PlayerWrapper(player);
     when(player.isCommandAvailable(anyInt())).thenReturn(true);
     when(player.getApplicationLooper()).thenReturn(Looper.myLooper());
   }

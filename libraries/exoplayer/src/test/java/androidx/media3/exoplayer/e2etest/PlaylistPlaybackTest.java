@@ -48,7 +48,7 @@ public final class PlaylistPlaybackTest {
       ShadowMediaCodecConfig.forAllSupportedMimeTypes();
 
   @Test
-  public void test_bypassOnThenOff() throws Exception {
+  public void test_bypassOnThenOn() throws Exception {
     Context applicationContext = ApplicationProvider.getApplicationContext();
     CapturingRenderersFactory capturingRenderersFactory =
         new CapturingRenderersFactory(applicationContext);
@@ -81,13 +81,8 @@ public final class PlaylistPlaybackTest {
     PlaybackOutput playbackOutput = PlaybackOutput.register(player, capturingRenderersFactory);
 
     player.addMediaItem(MediaItem.fromUri("asset:///media/mka/bear-opus.mka"));
-    player.prepare();
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ true);
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ false);
     player.addMediaItem(MediaItem.fromUri("asset:///media/wav/sample.wav"));
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ true);
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ false);
-    // Wait until second period has fully loaded to start the playback.
+    player.prepare();
     player.play();
     TestPlayerRunHelper.runUntilPlaybackState(player, Player.STATE_ENDED);
     player.release();
@@ -109,14 +104,10 @@ public final class PlaylistPlaybackTest {
             .setClock(new FakeClock(/* isAutoAdvancing= */ true))
             .setMediaSourceFactory(mediaSourceFactory)
             .build();
-    Surface surface = new Surface(new SurfaceTexture(/* texName= */ 1));
-    player.setVideoSurface(surface);
+    player.setVideoSurface(new Surface(new SurfaceTexture(/* texName= */ 1)));
     PlaybackOutput playbackOutput = PlaybackOutput.register(player, capturingRenderersFactory);
 
     player.addMediaItem(MediaItem.fromUri("asset:///media/mp4/preroll-5s.mp4"));
-    player.prepare();
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ true);
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ false);
     MediaItem mediaItemWithSubtitle =
         new MediaItem.Builder()
             .setUri("asset:///media/mp4/preroll-5s.mp4")
@@ -130,13 +121,10 @@ public final class PlaylistPlaybackTest {
                         .build()))
             .build();
     player.addMediaItem(mediaItemWithSubtitle);
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ true);
-    TestPlayerRunHelper.runUntilIsLoading(player, /* expectedIsLoading= */ false);
-    // Wait until second period has fully loaded to start the playback.
+    player.prepare();
     player.play();
     TestPlayerRunHelper.runUntilPlaybackState(player, Player.STATE_ENDED);
     player.release();
-    surface.release();
 
     DumpFileAsserts.assertOutput(
         applicationContext, playbackOutput, "playbackdumps/playlists/playlist_with_subtitles.dump");

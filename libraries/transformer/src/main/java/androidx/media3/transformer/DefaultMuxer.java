@@ -41,7 +41,6 @@ public final class DefaultMuxer implements Muxer {
     public Factory() {
       this(/* maxDelayBetweenSamplesMs= */ DEFAULT_MAX_DELAY_BETWEEN_SAMPLES_MS);
     }
-
     /**
      * Creates an instance.
      *

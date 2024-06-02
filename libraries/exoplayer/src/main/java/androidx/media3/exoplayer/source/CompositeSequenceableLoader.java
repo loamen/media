@@ -19,7 +19,6 @@ import static java.lang.Math.min;
 
 import androidx.media3.common.C;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.exoplayer.LoadingInfo;
 
 /** A {@link SequenceableLoader} that encapsulates multiple other {@link SequenceableLoader}s. */
 @UnstableApi
@@ -63,7 +62,7 @@ public class CompositeSequenceableLoader implements SequenceableLoader {
   }
 
   @Override
-  public boolean continueLoading(LoadingInfo loadingInfo) {
+  public boolean continueLoading(long positionUs) {
     boolean madeProgress = false;
     boolean madeProgressThisIteration;
     do {
@@ -76,9 +75,9 @@ public class CompositeSequenceableLoader implements SequenceableLoader {
         long loaderNextLoadPositionUs = loader.getNextLoadPositionUs();
         boolean isLoaderBehind =
             loaderNextLoadPositionUs != C.TIME_END_OF_SOURCE
-                && loaderNextLoadPositionUs <= loadingInfo.playbackPositionUs;
+                && loaderNextLoadPositionUs <= positionUs;
         if (loaderNextLoadPositionUs == nextLoadPositionUs || isLoaderBehind) {
-          madeProgressThisIteration |= loader.continueLoading(loadingInfo);
+          madeProgressThisIteration |= loader.continueLoading(positionUs);
         }
       }
       madeProgress |= madeProgressThisIteration;

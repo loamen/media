@@ -21,9 +21,7 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.trackselection.ExoTrackSelection;
 import androidx.media3.exoplayer.upstream.Allocator;
@@ -32,6 +30,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * A {@link MediaSource} that filters the available {@linkplain C.TrackType track types}.
@@ -156,8 +155,8 @@ public class FilteringMediaSource extends WrappingMediaSource {
     }
 
     @Override
-    public boolean continueLoading(LoadingInfo loadingInfo) {
-      return mediaPeriod.continueLoading(loadingInfo);
+    public boolean continueLoading(long positionUs) {
+      return mediaPeriod.continueLoading(positionUs);
     }
 
     @Override

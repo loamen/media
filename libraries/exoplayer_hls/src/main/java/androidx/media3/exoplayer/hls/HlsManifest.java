@@ -25,7 +25,6 @@ public final class HlsManifest {
 
   /** The multivariant playlist of an HLS stream. */
   public final HlsMultivariantPlaylist multivariantPlaylist;
-
   /** A snapshot of a media playlist referred to by {@link #multivariantPlaylist}. */
   public final HlsMediaPlaylist mediaPlaylist;
 

@@ -84,32 +84,22 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   @Target(TYPE_USE)
   @IntDef({RTSP_STATE_UNINITIALIZED, RTSP_STATE_INIT, RTSP_STATE_READY, RTSP_STATE_PLAYING})
   public @interface RtspState {}
-
   /** RTSP uninitialized state, the state before sending any SETUP request. */
   public static final int RTSP_STATE_UNINITIALIZED = -1;
-
   /** RTSP initial state, the state after sending SETUP REQUEST. */
   public static final int RTSP_STATE_INIT = 0;
-
   /** RTSP ready state, the state after receiving SETUP, or PAUSE response. */
   public static final int RTSP_STATE_READY = 1;
-
   /** RTSP playing state, the state after receiving PLAY response. */
   public static final int RTSP_STATE_PLAYING = 2;
 
   private static final String TAG = "RtspClient";
-
-  /**
-   * The default divisor used on the session timeout value to be set as the {@link
-   * KeepAliveMonitor#intervalMs}.
-   */
-  private static final int DEFAULT_RTSP_KEEP_ALIVE_INTERVAL_DIVISOR = 2;
+  private static final long DEFAULT_RTSP_KEEP_ALIVE_INTERVAL_MS = 30_000;
 
   /** A listener for session information update. */
   public interface SessionInfoListener {
     /** Called when the session information is available. */
     void onSessionTimelineUpdated(RtspSessionTiming timing, ImmutableList<RtspMediaTrack> tracks);
-
     /**
      * Called when failed to get session information from the RTSP server, or when error happened
      * during updating the session timeline.
@@ -150,7 +140,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private RtspMessageChannel messageChannel;
   @Nullable private RtspAuthUserInfo rtspAuthUserInfo;
   @Nullable private String sessionId;
-  private long sessionTimeoutMs;
   @Nullable private KeepAliveMonitor keepAliveMonitor;
   @Nullable private RtspAuthenticationInfo rtspAuthenticationInfo;
   private @RtspState int rtspState;
@@ -192,7 +181,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     this.messageSender = new MessageSender();
     this.uri = RtspMessageUtil.removeUserInfo(uri);
     this.messageChannel = new RtspMessageChannel(new MessageListener());
-    this.sessionTimeoutMs = RtspMessageUtil.DEFAULT_RTSP_TIMEOUT_MS;
     this.rtspAuthUserInfo = RtspMessageUtil.parseUserInfo(uri);
     this.pendingSeekPositionUs = C.TIME_UNSET;
     this.rtspState = RTSP_STATE_UNINITIALIZED;
@@ -740,7 +728,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
       rtspState = RTSP_STATE_READY;
       sessionId = response.sessionHeader.sessionId;
-      sessionTimeoutMs = response.sessionHeader.timeoutMs;
       continueSetupRtspTrack();
     }
 
@@ -749,9 +736,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
       rtspState = RTSP_STATE_PLAYING;
       if (keepAliveMonitor == null) {
-        keepAliveMonitor =
-            new KeepAliveMonitor(
-                /* intervalMs= */ sessionTimeoutMs / DEFAULT_RTSP_KEEP_ALIVE_INTERVAL_DIVISOR);
+        keepAliveMonitor = new KeepAliveMonitor(DEFAULT_RTSP_KEEP_ALIVE_INTERVAL_MS);
         keepAliveMonitor.start();
       }
 

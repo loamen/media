@@ -20,6 +20,7 @@ import static java.lang.annotation.ElementType.TYPE_USE;
 
 import android.util.Pair;
 import android.util.SparseArray;
+import android.util.SparseIntArray;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
@@ -27,10 +28,8 @@ import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.TransferListener;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.dash.PlayerEmsgHandler.PlayerEmsgCallback;
@@ -58,8 +57,6 @@ import androidx.media3.exoplayer.upstream.Allocator;
 import androidx.media3.exoplayer.upstream.CmcdConfiguration;
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy;
 import androidx.media3.exoplayer.upstream.LoaderErrorThrower;
-import androidx.media3.extractor.text.SubtitleParser;
-import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.lang.annotation.Documented;
@@ -68,11 +65,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /** A DASH {@link MediaPeriod}. */
 /* package */ final class DashMediaPeriod
@@ -131,8 +128,7 @@ import java.util.regex.Pattern;
       Allocator allocator,
       CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory,
       PlayerEmsgCallback playerEmsgCallback,
-      PlayerId playerId,
-      @Nullable SubtitleParser.Factory subtitleParserFactory) {
+      PlayerId playerId) {
     this.id = id;
     this.manifest = manifest;
     this.baseUrlExclusionList = baseUrlExclusionList;
@@ -158,8 +154,7 @@ import java.util.regex.Pattern;
     Period period = manifest.getPeriod(periodIndex);
     eventStreams = period.eventStreams;
     Pair<TrackGroupArray, TrackGroupInfo[]> result =
-        buildTrackGroups(
-            drmSessionManager, subtitleParserFactory, period.adaptationSets, eventStreams);
+        buildTrackGroups(drmSessionManager, period.adaptationSets, eventStreams);
     trackGroups = result.first;
     trackGroupInfos = result.second;
   }
@@ -320,8 +315,8 @@ import java.util.regex.Pattern;
   }
 
   @Override
-  public boolean continueLoading(LoadingInfo loadingInfo) {
-    return compositeSequenceableLoader.continueLoading(loadingInfo);
+  public boolean continueLoading(long positionUs) {
+    return compositeSequenceableLoader.continueLoading(positionUs);
   }
 
   @Override
@@ -504,7 +499,6 @@ import java.util.regex.Pattern;
 
   private static Pair<TrackGroupArray, TrackGroupInfo[]> buildTrackGroups(
       DrmSessionManager drmSessionManager,
-      @Nullable SubtitleParser.Factory subtitleParserFactory,
       List<AdaptationSet> adaptationSets,
       List<EventStream> eventStreams) {
     int[][] groupedAdaptationSetIndices = getGroupedAdaptationSetIndices(adaptationSets);
@@ -527,7 +521,6 @@ import java.util.regex.Pattern;
     int trackGroupCount =
         buildPrimaryAndEmbeddedTrackGroupInfos(
             drmSessionManager,
-            subtitleParserFactory,
             adaptationSets,
             groupedAdaptationSetIndices,
             primaryGroupCount,
@@ -557,8 +550,7 @@ import java.util.regex.Pattern;
    */
   private static int[][] getGroupedAdaptationSetIndices(List<AdaptationSet> adaptationSets) {
     int adaptationSetCount = adaptationSets.size();
-    HashMap<Long, Integer> adaptationSetIdToIndex =
-        Maps.newHashMapWithExpectedSize(adaptationSetCount);
+    SparseIntArray adaptationSetIdToIndex = new SparseIntArray(adaptationSetCount);
     List<List<Integer>> adaptationSetGroupedIndices = new ArrayList<>(adaptationSetCount);
     SparseArray<List<Integer>> adaptationSetIndexToGroupedIndices =
         new SparseArray<>(adaptationSetCount);
@@ -586,9 +578,10 @@ import java.util.regex.Pattern;
         trickPlayProperty = findTrickPlayProperty(adaptationSet.supplementalProperties);
       }
       if (trickPlayProperty != null) {
-        long mainAdaptationSetId = Long.parseLong(trickPlayProperty.value);
-        @Nullable Integer mainAdaptationSetIndex = adaptationSetIdToIndex.get(mainAdaptationSetId);
-        if (mainAdaptationSetIndex != null) {
+        int mainAdaptationSetId = Integer.parseInt(trickPlayProperty.value);
+        int mainAdaptationSetIndex =
+            adaptationSetIdToIndex.get(mainAdaptationSetId, /* valueIfKeyNotFound= */ -1);
+        if (mainAdaptationSetIndex != -1) {
           mergedGroupIndex = mainAdaptationSetIndex;
         }
       }
@@ -602,11 +595,11 @@ import java.util.regex.Pattern;
         if (adaptationSetSwitchingProperty != null) {
           String[] otherAdaptationSetIds = Util.split(adaptationSetSwitchingProperty.value, ",");
           for (String adaptationSetId : otherAdaptationSetIds) {
-            @Nullable
-            Integer otherAdaptationSetIndex =
-                adaptationSetIdToIndex.get(Long.parseLong(adaptationSetId));
-            if (otherAdaptationSetIndex != null) {
-              mergedGroupIndex = min(mergedGroupIndex, otherAdaptationSetIndex);
+            int otherAdaptationSetId =
+                adaptationSetIdToIndex.get(
+                    Integer.parseInt(adaptationSetId), /* valueIfKeyNotFound= */ -1);
+            if (otherAdaptationSetId != -1) {
+              mergedGroupIndex = min(mergedGroupIndex, otherAdaptationSetId);
             }
           }
         }
@@ -667,7 +660,6 @@ import java.util.regex.Pattern;
 
   private static int buildPrimaryAndEmbeddedTrackGroupInfos(
       DrmSessionManager drmSessionManager,
-      @Nullable SubtitleParser.Factory subtitleParserFactory,
       List<AdaptationSet> adaptationSets,
       int[][] groupedAdaptationSetIndices,
       int primaryGroupCount,
@@ -684,30 +676,14 @@ import java.util.regex.Pattern;
       }
       Format[] formats = new Format[representations.size()];
       for (int j = 0; j < formats.length; j++) {
-        Format originalFormat = representations.get(j).format;
-        Format.Builder updatedFormat =
-            originalFormat
-                .buildUpon()
-                .setCryptoType(drmSessionManager.getCryptoType(originalFormat));
-        if (subtitleParserFactory != null && subtitleParserFactory.supportsFormat(originalFormat)) {
-          updatedFormat
-              .setSampleMimeType(MimeTypes.APPLICATION_MEDIA3_CUES)
-              .setCueReplacementBehavior(
-                  subtitleParserFactory.getCueReplacementBehavior(originalFormat))
-              .setCodecs(
-                  originalFormat.sampleMimeType
-                      + (originalFormat.codecs != null ? " " + originalFormat.codecs : ""))
-              // Reset this value to the default. All non-default timestamp adjustments are done
-              // by SubtitleTranscodingExtractor and there are no 'subsamples' after transcoding.
-              .setSubsampleOffsetUs(Format.OFFSET_SAMPLE_RELATIVE);
-        }
-        formats[j] = updatedFormat.build();
+        Format format = representations.get(j).format;
+        formats[j] = format.copyWithCryptoType(drmSessionManager.getCryptoType(format));
       }
 
       AdaptationSet firstAdaptationSet = adaptationSets.get(adaptationSetIndices[0]);
       String trackGroupId =
           firstAdaptationSet.id != AdaptationSet.ID_UNSET
-              ? Long.toString(firstAdaptationSet.id)
+              ? Integer.toString(firstAdaptationSet.id)
               : ("unset:" + i);
       int primaryTrackGroupIndex = trackGroupCount++;
       int eventMessageTrackGroupIndex =

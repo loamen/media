@@ -22,7 +22,6 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
-import androidx.media3.common.C;
 import androidx.media3.common.VideoFrameProcessingException;
 import androidx.media3.common.util.BitmapLoader;
 import androidx.media3.common.util.GlUtil;
@@ -32,7 +31,6 @@ import androidx.media3.datasource.DataSourceBitmapLoader;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.util.concurrent.ExecutionException;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Creates {@link TextureOverlay}s from {@link Bitmap}s.
@@ -42,11 +40,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 @UnstableApi
 public abstract class BitmapOverlay extends TextureOverlay {
   private int lastTextureId;
-  private @Nullable Bitmap lastBitmap;
-
-  BitmapOverlay() {
-    lastTextureId = C.INDEX_UNSET;
-  }
+  private @MonotonicNonNull Bitmap lastBitmap;
 
   /**
    * Returns the overlay bitmap displayed at the specified timestamp.
@@ -74,9 +68,6 @@ public abstract class BitmapOverlay extends TextureOverlay {
     if (bitmap != lastBitmap) {
       try {
         lastBitmap = bitmap;
-        if (lastTextureId != -1) {
-          GlUtil.deleteTexture(lastTextureId);
-        }
         lastTextureId =
             GlUtil.createTexture(
                 bitmap.getWidth(),
@@ -86,7 +77,7 @@ public abstract class BitmapOverlay extends TextureOverlay {
         GLUtils.texImage2D(
             GLES20.GL_TEXTURE_2D,
             /* level= */ 0,
-            BitmapUtil.flipBitmapVertically(checkNotNull(lastBitmap)),
+            BitmapUtil.flipBitmapVertically(lastBitmap),
             /* border= */ 0);
         GlUtil.checkGlError();
       } catch (GlUtil.GlException e) {
@@ -155,10 +146,7 @@ public abstract class BitmapOverlay extends TextureOverlay {
           ListenableFuture<Bitmap> future = bitmapLoader.loadBitmap(overlayBitmapUri);
           try {
             lastBitmap = future.get();
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new VideoFrameProcessingException(e);
-          } catch (ExecutionException e) {
+          } catch (ExecutionException | InterruptedException e) {
             throw new VideoFrameProcessingException(e);
           }
         }
@@ -170,19 +158,5 @@ public abstract class BitmapOverlay extends TextureOverlay {
         return overlaySettings;
       }
     };
-  }
-
-  @Override
-  public void release() throws VideoFrameProcessingException {
-    super.release();
-    lastBitmap = null;
-    if (lastTextureId != -1) {
-      try {
-        GlUtil.deleteTexture(lastTextureId);
-      } catch (GlUtil.GlException e) {
-        throw new VideoFrameProcessingException(e);
-      }
-    }
-    lastTextureId = C.INDEX_UNSET;
   }
 }

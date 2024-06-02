@@ -25,26 +25,29 @@ import android.graphics.PixelFormat;
 import android.media.Image;
 import android.media.ImageReader;
 import androidx.annotation.Nullable;
+import androidx.media3.common.C;
 import androidx.media3.common.ColorInfo;
 import androidx.media3.common.DebugViewProvider;
-import androidx.media3.common.Effect;
 import androidx.media3.common.FrameInfo;
+import androidx.media3.common.GlObjectsProvider;
+import androidx.media3.common.GlTextureInfo;
 import androidx.media3.common.SurfaceInfo;
 import androidx.media3.common.VideoFrameProcessingException;
 import androidx.media3.common.VideoFrameProcessor;
-import androidx.media3.common.util.NullableType;
+import androidx.media3.common.util.GlUtil;
 import androidx.media3.common.util.Util;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.junit.After;
@@ -57,13 +60,11 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
 
   private static final int WIDTH = 200;
   private static final int HEIGHT = 100;
-
   /**
    * Time to wait between rendering frames to avoid frame drops between GL and the {@link
    * ImageReader}.
    */
   private static final long PER_FRAME_RENDERING_WAIT_TIME_MS = 1000L;
-
   /** Maximum time to wait for each rendered frame to be notified. */
   private static final long PER_FRAME_TIMEOUT_MS = 5000L;
 
@@ -85,7 +86,7 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
     long originalPresentationTimeUs = 1234;
     AtomicLong actualPresentationTimeUs = new AtomicLong();
     processFramesToEndOfStream(
-        /* inputPresentationTimesUs= */ ImmutableList.of(originalPresentationTimeUs),
+        /* inputPresentationTimesUs= */ new long[] {originalPresentationTimeUs},
         /* onFrameAvailableListener= */ actualPresentationTimeUs::set,
         /* renderFramesAutomatically= */ true);
 
@@ -97,7 +98,7 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
 
   @Test
   public void automaticFrameRendering_withThreeFrames_reusesInputTimestamps() throws Exception {
-    ImmutableList<Long> originalPresentationTimesUs = ImmutableList.of(1234L, 3456L, 4567L);
+    long[] originalPresentationTimesUs = new long[] {1234, 3456, 4567};
     ArrayList<Long> actualPresentationTimesUs = new ArrayList<>();
     processFramesToEndOfStream(
         originalPresentationTimesUs,
@@ -109,21 +110,24 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
             // to swap buffers, to avoid this behavior.
             Thread.sleep(PER_FRAME_RENDERING_WAIT_TIME_MS);
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
           }
         },
         /* renderFramesAutomatically= */ true);
 
     assertThat(actualPresentationTimesUs)
-        .containsExactlyElementsIn(originalPresentationTimesUs)
+        .containsExactly(
+            originalPresentationTimesUs[0],
+            originalPresentationTimesUs[1],
+            originalPresentationTimesUs[2])
         .inOrder();
     ImmutableList<Long> actualRenderTimesNs =
         waitForFrameRenderingAndGetRenderTimesNs(/* expectedFrameCount= */ 3);
     assertThat(actualRenderTimesNs)
-        .containsExactlyElementsIn(
-            // Convert microseconds to nanoseconds.
-            Iterables.transform(originalPresentationTimesUs, input -> MICROS_TO_NANOS * input))
+        .containsExactly(
+            MICROS_TO_NANOS * originalPresentationTimesUs[0],
+            MICROS_TO_NANOS * originalPresentationTimesUs[1],
+            MICROS_TO_NANOS * originalPresentationTimesUs[2])
         .inOrder();
   }
 
@@ -133,7 +137,7 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
     long renderTimesNs = System.nanoTime() + 345678;
     AtomicLong actualPresentationTimeUs = new AtomicLong();
     processFramesToEndOfStream(
-        /* inputPresentationTimesUs= */ ImmutableList.of(originalPresentationTimeUs),
+        /* inputPresentationTimesUs= */ new long[] {originalPresentationTimeUs},
         /* onFrameAvailableListener= */ presentationTimeUs -> {
           actualPresentationTimeUs.set(presentationTimeUs);
           checkNotNull(defaultVideoFrameProcessor).renderOutputFrame(renderTimesNs);
@@ -152,7 +156,7 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
     long renderTimesNs = VideoFrameProcessor.RENDER_OUTPUT_FRAME_IMMEDIATELY;
     AtomicLong actualPresentationTimeUs = new AtomicLong();
     processFramesToEndOfStream(
-        /* inputPresentationTimesUs= */ ImmutableList.of(originalPresentationTimeUs),
+        /* inputPresentationTimesUs= */ new long[] {originalPresentationTimeUs},
         /* onFrameAvailableListener= */ presentationTimeUs -> {
           actualPresentationTimeUs.set(presentationTimeUs);
           checkNotNull(defaultVideoFrameProcessor).renderOutputFrame(renderTimesNs);
@@ -172,7 +176,7 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
     long renderTimeBeforeCurrentTimeNs = System.nanoTime() - 345678;
     AtomicLong actualPresentationTimeUs = new AtomicLong();
     processFramesToEndOfStream(
-        /* inputPresentationTimesUs= */ ImmutableList.of(originalPresentationTimeUs),
+        /* inputPresentationTimesUs= */ new long[] {originalPresentationTimeUs},
         /* onFrameAvailableListener= */ presentationTimeUs -> {
           actualPresentationTimeUs.set(presentationTimeUs);
           checkNotNull(defaultVideoFrameProcessor).renderOutputFrame(renderTimeBeforeCurrentTimeNs);
@@ -191,7 +195,7 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
     long originalPresentationTimeUs = 1234;
     AtomicLong actualPresentationTimeUs = new AtomicLong();
     processFramesToEndOfStream(
-        /* inputPresentationTimesUs= */ ImmutableList.of(originalPresentationTimeUs),
+        /* inputPresentationTimesUs= */ new long[] {originalPresentationTimeUs},
         /* onFrameAvailableListener= */ presentationTimeNs -> {
           actualPresentationTimeUs.set(presentationTimeNs);
           checkNotNull(defaultVideoFrameProcessor)
@@ -205,10 +209,9 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
   @Test
   public void controlledFrameRendering_withThreeIndividualFrames_usesGivenTimestamps()
       throws Exception {
-    ImmutableList<Long> originalPresentationTimesUs = ImmutableList.of(1234L, 3456L, 4567L);
+    long[] originalPresentationTimesUs = new long[] {1234, 3456, 4567};
     long offsetNs = System.nanoTime();
-    ImmutableList<Long> renderTimesNs =
-        ImmutableList.of(offsetNs + 123456, offsetNs + 234567, offsetNs + 345678);
+    long[] renderTimesNs = new long[] {offsetNs + 123456, offsetNs + 234567, offsetNs + 345678};
     ArrayList<Long> actualPresentationTimesUs = new ArrayList<>();
     AtomicInteger frameIndex = new AtomicInteger();
     processFramesToEndOfStream(
@@ -216,36 +219,37 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
         /* onFrameAvailableListener= */ presentationTimeUs -> {
           actualPresentationTimesUs.add(presentationTimeUs);
           checkNotNull(defaultVideoFrameProcessor)
-              .renderOutputFrame(renderTimesNs.get(frameIndex.getAndIncrement()));
+              .renderOutputFrame(renderTimesNs[frameIndex.getAndIncrement()]);
           try {
             // TODO(b/264252759): Investigate output frames being dropped and remove sleep.
             // Frames can be dropped silently between EGL and the ImageReader. Sleep after each call
             // to swap buffers, to avoid this behavior.
             Thread.sleep(PER_FRAME_RENDERING_WAIT_TIME_MS);
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
           }
         },
         /* renderFramesAutomatically= */ false);
 
     assertThat(actualPresentationTimesUs)
-        .containsExactlyElementsIn(originalPresentationTimesUs)
+        .containsExactly(
+            originalPresentationTimesUs[0],
+            originalPresentationTimesUs[1],
+            originalPresentationTimesUs[2])
         .inOrder();
     int actualFrameCount = frameIndex.get();
-    assertThat(actualFrameCount).isEqualTo(originalPresentationTimesUs.size());
-    ImmutableList<Long> actualRenderTimesNs =
-        waitForFrameRenderingAndGetRenderTimesNs(actualFrameCount);
-    assertThat(actualRenderTimesNs).containsExactlyElementsIn(renderTimesNs).inOrder();
+    assertThat(actualFrameCount).isEqualTo(originalPresentationTimesUs.length);
+    long[] actualRenderTimesNs =
+        Longs.toArray(waitForFrameRenderingAndGetRenderTimesNs(actualFrameCount));
+    assertThat(actualRenderTimesNs).isEqualTo(renderTimesNs);
   }
 
   @Test
   public void controlledFrameRendering_withThreeFramesAtOnce_usesGivenTimestamps()
       throws Exception {
-    ImmutableList<Long> originalPresentationTimesUs = ImmutableList.of(1234L, 3456L, 4567L);
+    long[] originalPresentationTimesUs = new long[] {1234, 3456, 4567};
     long offsetNs = System.nanoTime();
-    ImmutableList<Long> renderTimesNs =
-        ImmutableList.of(offsetNs + 123456, offsetNs + 234567, offsetNs + 345678);
+    long[] renderTimesNs = new long[] {offsetNs + 123456, offsetNs + 234567, offsetNs + 345678};
     ArrayList<Long> actualPresentationTimesUs = new ArrayList<>();
     processFramesToEndOfStream(
         /* inputPresentationTimesUs= */ originalPresentationTimesUs,
@@ -255,19 +259,22 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
     // TODO(b/264252759): Investigate output frames being dropped and remove sleep.
     // Frames can be dropped silently between EGL and the ImageReader. Sleep after each call
     // to swap buffers, to avoid this behavior.
-    defaultVideoFrameProcessor.renderOutputFrame(renderTimesNs.get(0));
+    defaultVideoFrameProcessor.renderOutputFrame(renderTimesNs[0]);
     Thread.sleep(PER_FRAME_RENDERING_WAIT_TIME_MS);
-    defaultVideoFrameProcessor.renderOutputFrame(renderTimesNs.get(1));
+    defaultVideoFrameProcessor.renderOutputFrame(renderTimesNs[1]);
     Thread.sleep(PER_FRAME_RENDERING_WAIT_TIME_MS);
-    defaultVideoFrameProcessor.renderOutputFrame(renderTimesNs.get(2));
+    defaultVideoFrameProcessor.renderOutputFrame(renderTimesNs[2]);
     Thread.sleep(PER_FRAME_RENDERING_WAIT_TIME_MS);
 
     assertThat(actualPresentationTimesUs)
-        .containsExactlyElementsIn(originalPresentationTimesUs)
+        .containsExactly(
+            originalPresentationTimesUs[0],
+            originalPresentationTimesUs[1],
+            originalPresentationTimesUs[2])
         .inOrder();
-    ImmutableList<Long> actualRenderTimesNs =
-        waitForFrameRenderingAndGetRenderTimesNs(/* expectedFrameCount= */ 3);
-    assertThat(actualRenderTimesNs).containsExactlyElementsIn(renderTimesNs).inOrder();
+    long[] actualRenderTimesNs =
+        Longs.toArray(waitForFrameRenderingAndGetRenderTimesNs(/* expectedFrameCount= */ 3));
+    assertThat(actualRenderTimesNs).isEqualTo(renderTimesNs);
   }
 
   private interface OnOutputFrameAvailableForRenderingListener {
@@ -276,14 +283,13 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
 
   @EnsuresNonNull("defaultVideoFrameProcessor")
   private void processFramesToEndOfStream(
-      List<Long> inputPresentationTimesUs,
+      long[] inputPresentationTimesUs,
       OnOutputFrameAvailableForRenderingListener onFrameAvailableListener,
       boolean renderFramesAutomatically)
       throws Exception {
     AtomicReference<@NullableType VideoFrameProcessingException>
         videoFrameProcessingExceptionReference = new AtomicReference<>();
-    BlankFrameProducer blankFrameProducer = new BlankFrameProducer(WIDTH, HEIGHT);
-    CountDownLatch videoFrameProcessorReadyCountDownLatch = new CountDownLatch(1);
+    BlankFrameProducer blankFrameProducer = new BlankFrameProducer();
     CountDownLatch videoFrameProcessingEndedCountDownLatch = new CountDownLatch(1);
     defaultVideoFrameProcessor =
         checkNotNull(
@@ -291,6 +297,7 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
                 .build()
                 .create(
                     getApplicationContext(),
+                    ImmutableList.of((GlEffect) (context, useHdr) -> blankFrameProducer),
                     DebugViewProvider.NONE,
                     /* inputColorInfo= */ ColorInfo.SDR_BT709_LIMITED,
                     /* outputColorInfo= */ ColorInfo.SDR_BT709_LIMITED,
@@ -298,21 +305,13 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
                     MoreExecutors.directExecutor(),
                     new VideoFrameProcessor.Listener() {
                       @Override
-                      public void onInputStreamRegistered(
-                          @VideoFrameProcessor.InputType int inputType,
-                          List<Effect> effects,
-                          FrameInfo frameInfo) {
-                        videoFrameProcessorReadyCountDownLatch.countDown();
-                      }
-
-                      @Override
                       public void onOutputSizeChanged(int width, int height) {
                         ImageReader outputImageReader =
                             ImageReader.newInstance(
                                 width,
                                 height,
                                 PixelFormat.RGBA_8888,
-                                /* maxImages= */ inputPresentationTimesUs.size());
+                                /* maxImages= */ inputPresentationTimesUs.length);
                         checkNotNull(defaultVideoFrameProcessor)
                             .setOutputSurfaceInfo(
                                 new SurfaceInfo(outputImageReader.getSurface(), width, height));
@@ -341,18 +340,19 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
                         videoFrameProcessingEndedCountDownLatch.countDown();
                       }
                     }));
-
-    defaultVideoFrameProcessor.getTaskExecutor().submit(blankFrameProducer::configureGlObjects);
-    // A frame needs to be registered despite not queuing any external input to ensure
-    // that the video frame processor knows about the stream offset.
-    checkNotNull(defaultVideoFrameProcessor)
-        .registerInputStream(
-            INPUT_TYPE_SURFACE,
-            /* effects= */ ImmutableList.of((GlEffect) (context, useHdr) -> blankFrameProducer),
-            new FrameInfo.Builder(WIDTH, HEIGHT).build());
-    videoFrameProcessorReadyCountDownLatch.await();
-    blankFrameProducer.produceBlankFrames(inputPresentationTimesUs);
-    defaultVideoFrameProcessor.signalEndOfInput();
+    defaultVideoFrameProcessor
+        .getTaskExecutor()
+        .submit(
+            () -> {
+              blankFrameProducer.configureGlObjects();
+              // A frame needs to be registered despite not queuing any external input to ensure
+              // that the video frame processor knows about the stream offset.
+              checkNotNull(defaultVideoFrameProcessor).registerInputStream(INPUT_TYPE_SURFACE);
+              defaultVideoFrameProcessor.setInputFrameInfo(
+                  new FrameInfo.Builder(WIDTH, HEIGHT).build());
+              blankFrameProducer.produceBlankFramesAndQueueEndOfStream(inputPresentationTimesUs);
+              defaultVideoFrameProcessor.signalEndOfInput();
+            });
     videoFrameProcessingEndedCountDownLatch.await();
     @Nullable
     Exception videoFrameProcessingException = videoFrameProcessingExceptionReference.get();
@@ -371,5 +371,70 @@ public final class DefaultVideoFrameProcessorVideoFrameRenderingTest {
     // render times after this method has been called.
     assertThat(outputRenderTimesNs).isEmpty();
     return listBuilder.build();
+  }
+
+  /** Produces blank frames with the given timestamps. */
+  private static final class BlankFrameProducer implements GlShaderProgram {
+
+    private @MonotonicNonNull GlTextureInfo blankTexture;
+    private @MonotonicNonNull OutputListener outputListener;
+
+    public void configureGlObjects() throws VideoFrameProcessingException {
+      try {
+        int texId =
+            GlUtil.createTexture(WIDTH, HEIGHT, /* useHighPrecisionColorComponents= */ false);
+        int fboId = GlUtil.createFboForTexture(texId);
+        blankTexture = new GlTextureInfo(texId, fboId, /* rboId= */ C.INDEX_UNSET, WIDTH, HEIGHT);
+        GlUtil.focusFramebufferUsingCurrentContext(fboId, WIDTH, HEIGHT);
+        GlUtil.clearOutputFrame();
+      } catch (GlUtil.GlException e) {
+        throw new VideoFrameProcessingException(e);
+      }
+    }
+
+    public void produceBlankFramesAndQueueEndOfStream(long[] presentationTimesUs) {
+      checkNotNull(outputListener);
+      for (long presentationTimeUs : presentationTimesUs) {
+        outputListener.onOutputFrameAvailable(checkNotNull(blankTexture), presentationTimeUs);
+      }
+    }
+
+    @Override
+    public void setInputListener(InputListener inputListener) {}
+
+    @Override
+    public void setOutputListener(OutputListener outputListener) {
+      this.outputListener = outputListener;
+    }
+
+    @Override
+    public void setErrorListener(Executor executor, ErrorListener errorListener) {}
+
+    @Override
+    public void setGlObjectsProvider(GlObjectsProvider glObjectsProvider) {}
+
+    @Override
+    public void queueInputFrame(GlTextureInfo inputTexture, long presentationTimeUs) {
+      // No input is queued in these tests. The BlankFrameProducer is used to produce frames.
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void releaseOutputFrame(GlTextureInfo outputTexture) {}
+
+    @Override
+    public void signalEndOfCurrentInputStream() {
+      checkNotNull(outputListener).onCurrentOutputStreamEnded();
+    }
+
+    @Override
+    public void flush() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void release() {
+      // Do nothing as destroying the OpenGL context destroys the texture.
+    }
   }
 }

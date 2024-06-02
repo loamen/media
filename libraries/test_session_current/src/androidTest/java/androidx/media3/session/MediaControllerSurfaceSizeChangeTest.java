@@ -22,7 +22,6 @@ import static androidx.media3.test.session.common.TestUtils.TIMEOUT_MS;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-import android.os.Looper;
 import android.os.RemoteException;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -33,14 +32,14 @@ import android.view.ViewGroup.LayoutParams;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Player;
-import androidx.media3.test.session.common.MainLooperTestRule;
+import androidx.media3.test.session.common.HandlerThreadTestRule;
 import androidx.media3.test.session.common.PollingCheck;
 import androidx.media3.test.session.common.SurfaceActivity;
 import androidx.media3.test.session.common.TestUtils;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.LargeTest;
 import androidx.test.rule.ActivityTestRule;
-import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,6 +48,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.RuleChain;
+import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -59,6 +60,8 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 @LargeTest
 public class MediaControllerSurfaceSizeChangeTest {
+
+  private static final String TAG = "MCSurfaceSizeChangeTest";
 
   private static final String SET_VIDEO_SURFACE = "setVideoSurface";
   private static final String SET_VIDEO_SURFACE_HOLDER = "setVideoSurfaceHolder";
@@ -78,11 +81,11 @@ public class MediaControllerSurfaceSizeChangeTest {
   @Parameterized.Parameters(
       name = "action:{0}, precondition:{1}, sizeCondition:{2}, callbackShouldBeCalled:{3}")
   public static List<Object[]> params() {
-    return ImmutableList.of(
+    return Arrays.asList(
         // Major use cases
         new Object[] {SET_VIDEO_SURFACE, SET_VIDEO_SURFACE, SIZE_SAME, false},
         new Object[] {SET_VIDEO_SURFACE, SET_VIDEO_SURFACE, SIZE_DIFFERENT, false},
-        new Object[] {SET_VIDEO_SURFACE, NO_PRECONDITION, SIZE_NOT_APPLICABLE, false},
+        new Object[] {SET_VIDEO_SURFACE, NO_PRECONDITION, SIZE_NOT_APPLICABLE, true},
         new Object[] {SET_VIDEO_SURFACE_HOLDER, SET_VIDEO_SURFACE_HOLDER, SIZE_SAME, false},
         new Object[] {SET_VIDEO_SURFACE_HOLDER, SET_VIDEO_SURFACE_HOLDER, SIZE_DIFFERENT, true},
         new Object[] {SET_VIDEO_SURFACE_HOLDER, NO_PRECONDITION, SIZE_NOT_APPLICABLE, true},
@@ -122,10 +125,15 @@ public class MediaControllerSurfaceSizeChangeTest {
         new Object[] {SET_VIDEO_TEXTURE_VIEW, SET_VIDEO_SURFACE_HOLDER, SIZE_DIFFERENT, true},
         new Object[] {SET_VIDEO_TEXTURE_VIEW, SET_VIDEO_SURFACE_VIEW, SIZE_SAME, false},
         new Object[] {SET_VIDEO_TEXTURE_VIEW, SET_VIDEO_SURFACE_VIEW, SIZE_DIFFERENT, true},
-        new Object[] {CLEAR_VIDEO_SURFACE, NO_PRECONDITION, SIZE_NOT_APPLICABLE, true});
+        new Object[] {CLEAR_VIDEO_SURFACE, NO_PRECONDITION, SIZE_NOT_APPLICABLE, false});
   }
 
-  @Rule public final MainLooperTestRule mainLooperTestRule = new MainLooperTestRule();
+  private final HandlerThreadTestRule threadTestRule = new HandlerThreadTestRule(TAG);
+  private final MediaControllerTestRule controllerTestRule =
+      new MediaControllerTestRule(threadTestRule);
+
+  @Rule
+  public final TestRule chain = RuleChain.outerRule(threadTestRule).around(controllerTestRule);
 
   private final String action;
   private final String precondition;
@@ -142,6 +150,7 @@ public class MediaControllerSurfaceSizeChangeTest {
 
   private SurfaceActivity activity;
   private RemoteMediaSession remoteSession;
+  private MediaController controller;
 
   @Nullable private View viewForPrecondition;
   @Nullable private View viewForAction;
@@ -154,6 +163,7 @@ public class MediaControllerSurfaceSizeChangeTest {
     remoteSession =
         new RemoteMediaSession(
             DEFAULT_TEST_NAME, ApplicationProvider.getApplicationContext(), null);
+    controller = controllerTestRule.createController(remoteSession.getToken());
   }
 
   @After
@@ -179,49 +189,49 @@ public class MediaControllerSurfaceSizeChangeTest {
 
   @Test
   public void test() throws Throwable {
-    MediaController controller =
-        new MediaController.Builder(activity, remoteSession.getToken())
-            .setApplicationLooper(Looper.getMainLooper())
-            .buildAsync()
-            .get();
-    setPrecondition(controller);
+    setPrecondition();
     setViewForAction();
     matchSizeOfViewForAction();
     setExpectedWidthAndHeightFromCallback();
 
-    doAction(controller);
+    doAction();
 
     waitCallbackAndAssert();
   }
 
-  private void setPrecondition(MediaController controller) throws Exception {
+  private void setPrecondition() throws Exception {
     switch (precondition) {
       case SET_VIDEO_SURFACE:
         {
           Surface testSurface = activity.getFirstSurfaceHolder().getSurface();
-          MainLooperTestRule.runOnMainSync(() -> controller.setVideoSurface(testSurface));
+          threadTestRule.getHandler().postAndSync(() -> controller.setVideoSurface(testSurface));
           viewForPrecondition = activity.getFirstSurfaceView();
           break;
         }
       case SET_VIDEO_SURFACE_HOLDER:
         {
           SurfaceHolder testSurfaceHolder = activity.getFirstSurfaceHolder();
-          MainLooperTestRule.runOnMainSync(
-              () -> controller.setVideoSurfaceHolder(testSurfaceHolder));
+          threadTestRule
+              .getHandler()
+              .postAndSync(() -> controller.setVideoSurfaceHolder(testSurfaceHolder));
           viewForPrecondition = activity.getFirstSurfaceView();
           break;
         }
       case SET_VIDEO_SURFACE_VIEW:
         {
           SurfaceView testSurfaceView = activity.getFirstSurfaceView();
-          MainLooperTestRule.runOnMainSync(() -> controller.setVideoSurfaceView(testSurfaceView));
+          threadTestRule
+              .getHandler()
+              .postAndSync(() -> controller.setVideoSurfaceView(testSurfaceView));
           viewForPrecondition = activity.getFirstSurfaceView();
           break;
         }
       case SET_VIDEO_TEXTURE_VIEW:
         {
           TextureView testTextureView = activity.getFirstTextureView();
-          MainLooperTestRule.runOnMainSync(() -> controller.setVideoTextureView(testTextureView));
+          threadTestRule
+              .getHandler()
+              .postAndSync(() -> controller.setVideoTextureView(testTextureView));
           viewForPrecondition = activity.getFirstTextureView();
           break;
         }
@@ -231,26 +241,28 @@ public class MediaControllerSurfaceSizeChangeTest {
       default:
         throw new AssertionError(precondition + " is not an allowed precondition.");
     }
-    MainLooperTestRule.runOnMainSync(
-        () ->
-            controller.addListener(
-                new Player.Listener() {
-                  @Override
-                  public void onSurfaceSizeChanged(int width, int height) {
-                    if (countDownLatch.getCount() == 0) {
-                      return;
-                    }
-                    newSurfaceWidthRef.set(width);
-                    newSurfaceHeightRef.set(height);
-                    countDownLatch.countDown();
-                  }
+    threadTestRule
+        .getHandler()
+        .postAndSync(
+            () ->
+                controller.addListener(
+                    new Player.Listener() {
+                      @Override
+                      public void onSurfaceSizeChanged(int width, int height) {
+                        if (countDownLatch.getCount() == 0) {
+                          return;
+                        }
+                        newSurfaceWidthRef.set(width);
+                        newSurfaceHeightRef.set(height);
+                        countDownLatch.countDown();
+                      }
 
-                  @Override
-                  public void onEvents(Player player, Player.Events events) {
-                    eventsRef.set(events);
-                    countDownLatch.countDown();
-                  }
-                }));
+                      @Override
+                      public void onEvents(Player player, Player.Events events) {
+                        eventsRef.set(events);
+                        countDownLatch.countDown();
+                      }
+                    }));
   }
 
   private void setViewForAction() {
@@ -309,38 +321,43 @@ public class MediaControllerSurfaceSizeChangeTest {
     }
   }
 
-  private void doAction(MediaController controller) throws Exception {
+  private void doAction() throws Exception {
     switch (action) {
       case SET_VIDEO_SURFACE:
         {
           SurfaceView testSurfaceView = (SurfaceView) viewForAction;
           Surface surface = testSurfaceView.getHolder().getSurface();
-          MainLooperTestRule.runOnMainSync(() -> controller.setVideoSurface(surface));
+          threadTestRule.getHandler().postAndSync(() -> controller.setVideoSurface(surface));
           break;
         }
       case SET_VIDEO_SURFACE_HOLDER:
         {
           SurfaceView testSurfaceView = (SurfaceView) viewForAction;
           SurfaceHolder testSurfaceHolder = testSurfaceView.getHolder();
-          MainLooperTestRule.runOnMainSync(
-              () -> controller.setVideoSurfaceHolder(testSurfaceHolder));
+          threadTestRule
+              .getHandler()
+              .postAndSync(() -> controller.setVideoSurfaceHolder(testSurfaceHolder));
           break;
         }
       case SET_VIDEO_SURFACE_VIEW:
         {
           SurfaceView testSurfaceView = (SurfaceView) viewForAction;
-          MainLooperTestRule.runOnMainSync(() -> controller.setVideoSurfaceView(testSurfaceView));
+          threadTestRule
+              .getHandler()
+              .postAndSync(() -> controller.setVideoSurfaceView(testSurfaceView));
           break;
         }
       case SET_VIDEO_TEXTURE_VIEW:
         {
           TextureView testTextureView = (TextureView) viewForAction;
-          MainLooperTestRule.runOnMainSync(() -> controller.setVideoTextureView(testTextureView));
+          threadTestRule
+              .getHandler()
+              .postAndSync(() -> controller.setVideoTextureView(testTextureView));
           break;
         }
       case CLEAR_VIDEO_SURFACE:
         {
-          MainLooperTestRule.runOnMainSync(controller::clearVideoSurface);
+          threadTestRule.getHandler().postAndSync(() -> controller.clearVideoSurface());
           break;
         }
       default:

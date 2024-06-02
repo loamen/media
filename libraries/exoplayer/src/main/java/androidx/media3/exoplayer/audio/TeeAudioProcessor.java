@@ -82,7 +82,7 @@ public final class TeeAudioProcessor extends BaseAudioProcessor {
     if (remaining == 0) {
       return;
     }
-    audioBufferSink.handleBuffer(Util.createReadOnlyByteBuffer(inputBuffer));
+    audioBufferSink.handleBuffer(inputBuffer.asReadOnlyBuffer());
     replaceOutputBuffer(remaining).put(inputBuffer).flip();
   }
 

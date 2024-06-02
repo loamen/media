@@ -26,7 +26,6 @@ import android.os.HandlerThread;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
-import androidx.collection.CircularIntArray;
 import androidx.media3.common.util.Util;
 import java.util.ArrayDeque;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -40,10 +39,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private @MonotonicNonNull Handler handler;
 
   @GuardedBy("lock")
-  private final CircularIntArray availableInputBuffers;
+  private final IntArrayQueue availableInputBuffers;
 
   @GuardedBy("lock")
-  private final CircularIntArray availableOutputBuffers;
+  private final IntArrayQueue availableOutputBuffers;
 
   @GuardedBy("lock")
   private final ArrayDeque<MediaCodec.BufferInfo> bufferInfos;
@@ -82,8 +81,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   /* package */ AsynchronousMediaCodecCallback(HandlerThread callbackThread) {
     this.lock = new Object();
     this.callbackThread = callbackThread;
-    this.availableInputBuffers = new CircularIntArray();
-    this.availableOutputBuffers = new CircularIntArray();
+    this.availableInputBuffers = new IntArrayQueue();
+    this.availableOutputBuffers = new IntArrayQueue();
     this.bufferInfos = new ArrayDeque<>();
     this.formats = new ArrayDeque<>();
   }
@@ -127,13 +126,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    */
   public int dequeueInputBufferIndex() {
     synchronized (lock) {
-      maybeThrowException();
       if (isFlushingOrShutdown()) {
         return MediaCodec.INFO_TRY_AGAIN_LATER;
       } else {
+        maybeThrowException();
         return availableInputBuffers.isEmpty()
             ? MediaCodec.INFO_TRY_AGAIN_LATER
-            : availableInputBuffers.popFirst();
+            : availableInputBuffers.remove();
       }
     }
   }
@@ -146,14 +145,14 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    */
   public int dequeueOutputBufferIndex(MediaCodec.BufferInfo bufferInfo) {
     synchronized (lock) {
-      maybeThrowException();
       if (isFlushingOrShutdown()) {
         return MediaCodec.INFO_TRY_AGAIN_LATER;
       } else {
+        maybeThrowException();
         if (availableOutputBuffers.isEmpty()) {
           return MediaCodec.INFO_TRY_AGAIN_LATER;
         } else {
-          int bufferIndex = availableOutputBuffers.popFirst();
+          int bufferIndex = availableOutputBuffers.remove();
           if (bufferIndex >= 0) {
             checkStateNotNull(currentFormat);
             MediaCodec.BufferInfo nextBufferInfo = bufferInfos.remove();
@@ -205,7 +204,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   @Override
   public void onInputBufferAvailable(MediaCodec codec, int index) {
     synchronized (lock) {
-      availableInputBuffers.addLast(index);
+      availableInputBuffers.add(index);
     }
   }
 
@@ -216,7 +215,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         addOutputFormat(pendingOutputFormat);
         pendingOutputFormat = null;
       }
-      availableOutputBuffers.addLast(index);
+      availableOutputBuffers.add(index);
       bufferInfos.add(info);
     }
   }
@@ -279,7 +278,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @GuardedBy("lock")
   private void addOutputFormat(MediaFormat mediaFormat) {
-    availableOutputBuffers.addLast(MediaCodec.INFO_OUTPUT_FORMAT_CHANGED);
+    availableOutputBuffers.add(MediaCodec.INFO_OUTPUT_FORMAT_CHANGED);
     formats.add(mediaFormat);
   }
 

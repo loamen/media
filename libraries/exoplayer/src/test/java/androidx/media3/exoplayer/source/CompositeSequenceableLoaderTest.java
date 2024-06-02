@@ -18,7 +18,6 @@ package androidx.media3.exoplayer.source;
 import static com.google.common.truth.Truth.assertThat;
 
 import androidx.media3.common.C;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -131,9 +130,9 @@ public final class CompositeSequenceableLoaderTest {
   }
 
   /**
-   * Tests that {@link CompositeSequenceableLoader#continueLoading(LoadingInfo)} only allows the
-   * loader with minimum next load position to continue loading if next load positions are not
-   * behind current playback position.
+   * Tests that {@link CompositeSequenceableLoader#continueLoading(long)} only allows the loader
+   * with minimum next load position to continue loading if next load positions are not behind
+   * current playback position.
    */
   @Test
   public void continueLoadingOnlyAllowFurthestBehindLoaderToLoadIfNotBehindPlaybackPosition() {
@@ -143,16 +142,15 @@ public final class CompositeSequenceableLoaderTest {
         new FakeSequenceableLoader(/* bufferedPositionUs */ 1001, /* nextLoadPositionUs */ 2001);
     CompositeSequenceableLoader compositeSequenceableLoader =
         new CompositeSequenceableLoader(new SequenceableLoader[] {loader1, loader2});
-    compositeSequenceableLoader.continueLoading(
-        new LoadingInfo.Builder().setPlaybackPositionUs(100).build());
+    compositeSequenceableLoader.continueLoading(100);
 
     assertThat(loader1.numInvocations).isEqualTo(1);
     assertThat(loader2.numInvocations).isEqualTo(0);
   }
 
   /**
-   * Tests that {@link CompositeSequenceableLoader#continueLoading(LoadingInfo)} allows all loaders
-   * with next load position behind current playback position to continue loading.
+   * Tests that {@link CompositeSequenceableLoader#continueLoading(long)} allows all loaders with
+   * next load position behind current playback position to continue loading.
    */
   @Test
   public void continueLoadingReturnAllowAllLoadersBehindPlaybackPositionToLoad() {
@@ -164,8 +162,7 @@ public final class CompositeSequenceableLoaderTest {
         new FakeSequenceableLoader(/* bufferedPositionUs */ 1002, /* nextLoadPositionUs */ 2002);
     CompositeSequenceableLoader compositeSequenceableLoader =
         new CompositeSequenceableLoader(new SequenceableLoader[] {loader1, loader2, loader3});
-    compositeSequenceableLoader.continueLoading(
-        new LoadingInfo.Builder().setPlaybackPositionUs(3000).build());
+    compositeSequenceableLoader.continueLoading(3000);
 
     assertThat(loader1.numInvocations).isEqualTo(1);
     assertThat(loader2.numInvocations).isEqualTo(1);
@@ -173,8 +170,8 @@ public final class CompositeSequenceableLoaderTest {
   }
 
   /**
-   * Tests that {@link CompositeSequenceableLoader#continueLoading(LoadingInfo)} does not allow
-   * loader with next load position at end-of-source to continue loading.
+   * Tests that {@link CompositeSequenceableLoader#continueLoading(long)} does not allow loader with
+   * next load position at end-of-source to continue loading.
    */
   @Test
   public void continueLoadingOnlyNotAllowEndOfSourceLoaderToLoad() {
@@ -186,17 +183,16 @@ public final class CompositeSequenceableLoaderTest {
             /* bufferedPositionUs */ 1001, /* nextLoadPositionUs */ C.TIME_END_OF_SOURCE);
     CompositeSequenceableLoader compositeSequenceableLoader =
         new CompositeSequenceableLoader(new SequenceableLoader[] {loader1, loader2});
-    compositeSequenceableLoader.continueLoading(
-        new LoadingInfo.Builder().setPlaybackPositionUs(3000).build());
+    compositeSequenceableLoader.continueLoading(3000);
 
     assertThat(loader1.numInvocations).isEqualTo(0);
     assertThat(loader2.numInvocations).isEqualTo(0);
   }
 
   /**
-   * Tests that {@link CompositeSequenceableLoader#continueLoading(LoadingInfo)} returns true if the
-   * loader with minimum next load position can make progress if next load positions are not behind
-   * current playback position.
+   * Tests that {@link CompositeSequenceableLoader#continueLoading(long)} returns true if the loader
+   * with minimum next load position can make progress if next load positions are not behind current
+   * playback position.
    */
   @Test
   public void continueLoadingReturnTrueIfFurthestBehindLoaderCanMakeProgress() {
@@ -209,16 +205,13 @@ public final class CompositeSequenceableLoaderTest {
     CompositeSequenceableLoader compositeSequenceableLoader =
         new CompositeSequenceableLoader(new SequenceableLoader[] {loader1, loader2});
 
-    assertThat(
-            compositeSequenceableLoader.continueLoading(
-                new LoadingInfo.Builder().setPlaybackPositionUs(100).build()))
-        .isTrue();
+    assertThat(compositeSequenceableLoader.continueLoading(100)).isTrue();
   }
 
   /**
-   * Tests that {@link CompositeSequenceableLoader#continueLoading(LoadingInfo)} returns true if any
-   * loader that are behind current playback position can make progress, even if it is not the one
-   * with minimum next load position.
+   * Tests that {@link CompositeSequenceableLoader#continueLoading(long)} returns true if any loader
+   * that are behind current playback position can make progress, even if it is not the one with
+   * minimum next load position.
    */
   @Test
   public void continueLoadingReturnTrueIfLoaderBehindPlaybackPositionCanMakeProgress() {
@@ -232,10 +225,7 @@ public final class CompositeSequenceableLoaderTest {
     CompositeSequenceableLoader compositeSequenceableLoader =
         new CompositeSequenceableLoader(new SequenceableLoader[] {loader1, loader2});
 
-    assertThat(
-            compositeSequenceableLoader.continueLoading(
-                new LoadingInfo.Builder().setPlaybackPositionUs(3000).build()))
-        .isTrue();
+    assertThat(compositeSequenceableLoader.continueLoading(3000)).isTrue();
   }
 
   private static class FakeSequenceableLoader implements SequenceableLoader {
@@ -261,7 +251,7 @@ public final class CompositeSequenceableLoaderTest {
     }
 
     @Override
-    public boolean continueLoading(LoadingInfo loadingInfo) {
+    public boolean continueLoading(long positionUs) {
       numInvocations++;
       boolean loaded = nextChunkDurationUs != 0;
       // The current chunk has been loaded, advance to next chunk.

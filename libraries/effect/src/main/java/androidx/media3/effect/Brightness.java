@@ -26,7 +26,7 @@ import java.util.Arrays;
 
 /** Modifies brightness of an input frame. */
 @UnstableApi
-public final class Brightness implements RgbMatrix {
+public class Brightness implements RgbMatrix {
 
   private final float[] rgbMatrix;
 

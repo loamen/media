@@ -60,7 +60,6 @@ import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.util.BitmapLoader;
-import androidx.media3.datasource.DataSourceBitmapLoader;
 import androidx.media3.session.PlayerInfo.BundlingExclusions;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -86,7 +85,7 @@ public final class MediaUtilsTest {
   @Before
   public void setUp() {
     context = ApplicationProvider.getApplicationContext();
-    bitmapLoader = new CacheBitmapLoader(new DataSourceBitmapLoader(context));
+    bitmapLoader = new CacheBitmapLoader(new SimpleBitmapLoader());
   }
 
   @Test
@@ -100,7 +99,7 @@ public final class MediaUtilsTest {
 
     MediaItem mediaItem = MediaUtils.convertToMediaItem(browserItem);
     assertThat(mediaItem.mediaId).isEqualTo(mediaId);
-    assertThat(mediaItem.mediaMetadata.title.toString()).isEqualTo(title);
+    assertThat(mediaItem.mediaMetadata.title).isEqualTo(title);
   }
 
   @Test
@@ -162,8 +161,8 @@ public final class MediaUtilsTest {
         MediaUtils.convertToMediaDescriptionCompat(mediaItem, /* artworkBitmap= */ null);
 
     assertThat(descriptionCompat.getMediaId()).isEqualTo(mediaId);
-    assertThat(descriptionCompat.getTitle().toString()).isEqualTo(title);
-    assertThat(descriptionCompat.getDescription().toString()).isEqualTo(description);
+    assertThat(descriptionCompat.getTitle()).isEqualTo(title);
+    assertThat(descriptionCompat.getDescription()).isEqualTo(description);
     assertThat(
             descriptionCompat
                 .getExtras()
@@ -204,8 +203,8 @@ public final class MediaUtilsTest {
 
   @Test
   public void convertToMediaMetadata_withTitle() {
-    String title = "title";
-    assertThat(MediaUtils.convertToMediaMetadata(title).title.toString()).isEqualTo(title);
+    CharSequence title = "title";
+    assertThat(MediaUtils.convertToMediaMetadata(title).title).isEqualTo(title);
   }
 
   @Test
@@ -269,7 +268,7 @@ public final class MediaUtilsTest {
             mediaItem.mediaMetadata,
             "mediaId",
             Uri.parse("http://www.example.com"),
-            /* durationMs= */ C.TIME_UNSET,
+            /* durotionsMs= */ C.TIME_UNSET,
             /* artworkBitmap= */ null);
 
     assertThat(
@@ -477,7 +476,7 @@ public final class MediaUtilsTest {
   @Test
   public void convertToSessionCommands_whenSessionIsNotReadyOnSdk21_disallowsRating() {
     SessionCommands sessionCommands =
-        MediaUtils.convertToSessionCommands(/* state= */ null, /* isSessionReady= */ false);
+        MediaUtils.convertToSessionCommands(/* playbackState= */ null, /* isSessionReady= */ false);
     assertThat(sessionCommands.contains(SessionCommand.COMMAND_CODE_SESSION_SET_RATING)).isFalse();
   }
 
@@ -947,7 +946,7 @@ public final class MediaUtilsTest {
     long currentPositionMs =
         MediaUtils.convertToCurrentPositionMs(
             /* playbackStateCompat= */ null,
-            /* metadataCompat= */ null,
+            /* currentMediaMetadata= */ null,
             /* timeDiffMs= */ C.TIME_UNSET);
     assertThat(currentPositionMs).isEqualTo(0);
   }
@@ -1114,8 +1113,7 @@ public final class MediaUtilsTest {
             oldPlayerInfo,
             BundlingExclusions.NONE,
             newPlayerInfo,
-            new BundlingExclusions(
-                /* isTimelineExcluded= */ true, /* areCurrentTracksExcluded= */ true),
+            new BundlingExclusions(/* isTimelineExcluded= */ true, /* areTracksExcluded= */ true),
             availableCommands);
 
     assertThat(mergeResult.first.timeline).isSameInstanceAs(oldPlayerInfo.timeline);
@@ -1157,8 +1155,7 @@ public final class MediaUtilsTest {
             oldPlayerInfo,
             BundlingExclusions.NONE,
             newPlayerInfo,
-            new BundlingExclusions(
-                /* isTimelineExcluded= */ true, /* areCurrentTracksExcluded= */ true),
+            new BundlingExclusions(/* isTimelineExcluded= */ true, /* areTracksExcluded= */ true),
             availableCommands);
 
     assertThat(mergeResult.first.timeline).isSameInstanceAs(Timeline.EMPTY);
@@ -1200,8 +1197,7 @@ public final class MediaUtilsTest {
             oldPlayerInfo,
             BundlingExclusions.NONE,
             newPlayerInfo,
-            new BundlingExclusions(
-                /* isTimelineExcluded= */ true, /* areCurrentTracksExcluded= */ true),
+            new BundlingExclusions(/* isTimelineExcluded= */ true, /* areTracksExcluded= */ true),
             availableCommands);
 
     assertThat(mergeResult.first.timeline).isSameInstanceAs(oldPlayerInfo.timeline);

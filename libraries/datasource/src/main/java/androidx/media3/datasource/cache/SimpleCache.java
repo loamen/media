@@ -51,7 +51,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 public final class SimpleCache implements Cache {
 
   private static final String TAG = "SimpleCache";
-
   /**
    * Cache files are distributed between a number of subdirectories. This helps to avoid poor
    * performance in cases where the performance of the underlying file system (e.g. FAT32) scales
@@ -652,8 +651,7 @@ public final class SimpleCache implements Cache {
       updateFile = true;
     }
     SimpleCacheSpan newSpan =
-        Assertions.checkNotNull(contentIndex.get(key))
-            .setLastTouchTimestamp(span, lastTouchTimestamp, updateFile);
+        contentIndex.get(key).setLastTouchTimestamp(span, lastTouchTimestamp, updateFile);
     notifySpanTouched(span, newSpan);
     return newSpan;
   }
@@ -674,7 +672,7 @@ public final class SimpleCache implements Cache {
     }
     while (true) {
       SimpleCacheSpan span = cachedContent.getSpan(position, length);
-      if (span.isCached && Assertions.checkNotNull(span.file).length() != span.length) {
+      if (span.isCached && span.file.length() != span.length) {
         // The file has been modified or deleted underneath us. It's likely that other files will
         // have been modified too, so scan the whole in-memory representation.
         removeStaleSpans();
@@ -702,7 +700,7 @@ public final class SimpleCache implements Cache {
     }
     totalSpace -= span.length;
     if (fileIndex != null) {
-      String fileName = Assertions.checkNotNull(span.file).getName();
+      String fileName = span.file.getName();
       try {
         fileIndex.remove(fileName);
       } catch (IOException e) {
@@ -723,7 +721,7 @@ public final class SimpleCache implements Cache {
     ArrayList<CacheSpan> spansToBeRemoved = new ArrayList<>();
     for (CachedContent cachedContent : contentIndex.getAll()) {
       for (CacheSpan span : cachedContent.getSpans()) {
-        if (Assertions.checkNotNull(span.file).length() != span.length) {
+        if (span.file.length() != span.length) {
           spansToBeRemoved.add(span);
         }
       }

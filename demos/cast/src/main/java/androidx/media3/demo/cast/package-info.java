@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 @NonNullApi
-@OptIn(markerClass = UnstableApi.class)
 package androidx.media3.demo.cast;
 
-import androidx.annotation.OptIn;
 import androidx.media3.common.util.NonNullApi;
-import androidx.media3.common.util.UnstableApi;

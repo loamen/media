@@ -147,10 +147,8 @@ public interface AssetLoader {
         SUPPORTED_OUTPUT_TYPE_DECODED,
       })
   @interface SupportedOutputTypes {}
-
   /** Indicates that the asset loader can output encoded samples. */
   int SUPPORTED_OUTPUT_TYPE_ENCODED = 1;
-
   /** Indicates that the asset loader can output decoded samples. */
   int SUPPORTED_OUTPUT_TYPE_DECODED = 1 << 1;
 

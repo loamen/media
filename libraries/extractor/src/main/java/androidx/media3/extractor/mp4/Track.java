@@ -40,10 +40,8 @@ public final class Track {
   @Target(TYPE_USE)
   @IntDef({TRANSFORMATION_NONE, TRANSFORMATION_CEA608_CDAT})
   public @interface Transformation {}
-
   /** A no-op sample transformation. */
   public static final int TRANSFORMATION_NONE = 0;
-
   /** A transformation for caption samples in cdat atoms. */
   public static final int TRANSFORMATION_CEA608_CDAT = 1;
 

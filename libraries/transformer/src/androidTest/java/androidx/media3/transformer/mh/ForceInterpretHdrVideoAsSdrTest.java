@@ -30,10 +30,8 @@ import androidx.media3.common.C;
 import androidx.media3.common.ColorInfo;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
-import androidx.media3.transformer.Composition;
-import androidx.media3.transformer.EditedMediaItem;
-import androidx.media3.transformer.EditedMediaItemSequence;
 import androidx.media3.transformer.ExportTestResult;
+import androidx.media3.transformer.TransformationRequest;
 import androidx.media3.transformer.Transformer;
 import androidx.media3.transformer.TransformerAndroidTestRunner;
 import androidx.test.core.app.ApplicationProvider;
@@ -43,7 +41,7 @@ import org.junit.runner.RunWith;
 
 /**
  * {@link Transformer} instrumentation test for {@linkplain
- * Composition#HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR forcing HDR contents to be
+ * TransformationRequest#HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR forcing HDR contents to be
  * interpreted as SDR}.
  */
 @RunWith(AndroidJUnit4.class)
@@ -72,18 +70,19 @@ public class ForceInterpretHdrVideoAsSdrTest {
       return;
     }
 
-    Transformer transformer = new Transformer.Builder(context).build();
-    EditedMediaItem editedMediaItem =
-        new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(MP4_ASSET_720P_4_SECOND_HDR10)))
+    Transformer transformer =
+        new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder()
+                    .setHdrMode(
+                        TransformationRequest.HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR)
+                    .build())
             .build();
-    Composition composition =
-        new Composition.Builder(new EditedMediaItemSequence(editedMediaItem))
-            .setHdrMode(Composition.HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR)
-            .build();
+    MediaItem mediaItem = MediaItem.fromUri(Uri.parse(MP4_ASSET_720P_4_SECOND_HDR10));
     ExportTestResult exportTestResult =
         new TransformerAndroidTestRunner.Builder(context, transformer)
             .build()
-            .run(testId, composition);
+            .run(testId, mediaItem);
 
     assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
   }
@@ -111,18 +110,19 @@ public class ForceInterpretHdrVideoAsSdrTest {
       return;
     }
 
-    Transformer transformer = new Transformer.Builder(context).build();
-    EditedMediaItem editedMediaItem =
-        new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(MP4_ASSET_1080P_5_SECOND_HLG10)))
+    Transformer transformer =
+        new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder()
+                    .setHdrMode(
+                        TransformationRequest.HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR)
+                    .build())
             .build();
-    Composition composition =
-        new Composition.Builder(new EditedMediaItemSequence(editedMediaItem))
-            .setHdrMode(Composition.HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR)
-            .build();
+    MediaItem mediaItem = MediaItem.fromUri(Uri.parse(MP4_ASSET_1080P_5_SECOND_HLG10));
     ExportTestResult exportTestResult =
         new TransformerAndroidTestRunner.Builder(context, transformer)
             .build()
-            .run(testId, composition);
+            .run(testId, mediaItem);
 
     assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
   }

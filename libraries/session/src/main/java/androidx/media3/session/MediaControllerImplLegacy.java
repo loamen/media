@@ -70,7 +70,6 @@ import androidx.media3.common.util.BitmapLoader;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.ListenerSet;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.Size;
 import androidx.media3.common.util.Util;
 import com.google.common.collect.ImmutableList;
@@ -85,6 +84,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.checkerframework.checker.initialization.qual.UnderInitialization;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /* package */ class MediaControllerImplLegacy implements MediaController.MediaControllerImpl {
 
@@ -107,8 +107,6 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
   private LegacyPlayerInfo legacyPlayerInfo;
   private LegacyPlayerInfo pendingLegacyPlayerInfo;
   private ControllerInfo controllerInfo;
-  private long currentPositionMs;
-  private long lastSetPlayWhenReadyCalledTimeMs;
 
   public MediaControllerImplLegacy(
       Context context,
@@ -132,8 +130,6 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
     controllerCompatCallback = new ControllerCompatCallback(applicationLooper);
     this.token = token;
     this.bitmapLoader = bitmapLoader;
-    currentPositionMs = C.TIME_UNSET;
-    lastSetPlayWhenReadyCalledTimeMs = C.TIME_UNSET;
   }
 
   /* package */ MediaController getInstance() {
@@ -231,12 +227,50 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
 
   @Override
   public void play() {
-    setPlayWhenReady(true);
+    if (controllerInfo.playerInfo.playWhenReady) {
+      return;
+    }
+    ControllerInfo maskedControllerInfo =
+        new ControllerInfo(
+            controllerInfo.playerInfo.copyWithPlayWhenReady(
+                /* playWhenReady= */ true,
+                Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
+                Player.PLAYBACK_SUPPRESSION_REASON_NONE),
+            controllerInfo.availableSessionCommands,
+            controllerInfo.availablePlayerCommands,
+            controllerInfo.customLayout);
+    updateStateMaskedControllerInfo(
+        maskedControllerInfo,
+        /* discontinuityReason= */ null,
+        /* mediaItemTransitionReason= */ null);
+
+    if (isPrepared() && hasMedia()) {
+      controllerCompat.getTransportControls().play();
+    }
   }
 
   @Override
   public void pause() {
-    setPlayWhenReady(false);
+    if (!controllerInfo.playerInfo.playWhenReady) {
+      return;
+    }
+    ControllerInfo maskedControllerInfo =
+        new ControllerInfo(
+            controllerInfo.playerInfo.copyWithPlayWhenReady(
+                /* playWhenReady= */ false,
+                Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
+                Player.PLAYBACK_SUPPRESSION_REASON_NONE),
+            controllerInfo.availableSessionCommands,
+            controllerInfo.availablePlayerCommands,
+            controllerInfo.customLayout);
+    updateStateMaskedControllerInfo(
+        maskedControllerInfo,
+        /* discontinuityReason= */ null,
+        /* mediaItemTransitionReason= */ null);
+
+    if (isPrepared() && hasMedia()) {
+      controllerCompat.getTransportControls().pause();
+    }
   }
 
   @Override
@@ -408,11 +442,6 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
   }
 
   @Override
-  public ImmutableList<CommandButton> getCustomLayout() {
-    return controllerInfo.customLayout;
-  }
-
-  @Override
   @Nullable
   public PlaybackException getPlayerError() {
     return controllerInfo.playerInfo.playerError;
@@ -425,13 +454,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
 
   @Override
   public long getCurrentPosition() {
-    currentPositionMs =
-        MediaUtils.getUpdatedCurrentPositionMs(
-            controllerInfo.playerInfo,
-            currentPositionMs,
-            lastSetPlayWhenReadyCalledTimeMs,
-            getInstance().getTimeDiffMs());
-    return currentPositionMs;
+    return controllerInfo.playerInfo.sessionPositionInfo.positionInfo.positionMs;
   }
 
   @Override
@@ -627,8 +650,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
                 /* durationMs= */ C.TIME_UNSET,
                 /* bufferedPositionMs= */ 0,
                 /* bufferedPercentage= */ 0,
-                /* totalBufferedDurationMs= */ 0),
-            Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED);
+                /* totalBufferedDurationMs= */ 0));
     ControllerInfo maskedControllerInfo =
         new ControllerInfo(
             maskedPlayerInfo,
@@ -689,9 +711,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
         calculateCurrentItemIndexAfterAddItems(currentMediaItemIndex, index, mediaItems.size());
     PlayerInfo maskedPlayerInfo =
         controllerInfo.playerInfo.copyWithTimelineAndMediaItemIndex(
-            newQueueTimeline,
-            newCurrentMediaItemIndex,
-            Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED);
+            newQueueTimeline, newCurrentMediaItemIndex);
     ControllerInfo maskedControllerInfo =
         new ControllerInfo(
             maskedPlayerInfo,
@@ -730,7 +750,6 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
     if (newCurrentMediaItemIndex == C.INDEX_UNSET) {
       newCurrentMediaItemIndex =
           Util.constrainValue(fromIndex, /* min= */ 0, newQueueTimeline.getWindowCount() - 1);
-      // TODO: b/302114474 - This also needs to reset the current position.
       Log.w(
           TAG,
           "Currently playing item is removed. Assumes item at "
@@ -740,9 +759,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
     }
     PlayerInfo maskedPlayerInfo =
         controllerInfo.playerInfo.copyWithTimelineAndMediaItemIndex(
-            newQueueTimeline,
-            newCurrentMediaItemIndex,
-            Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED);
+            newQueueTimeline, newCurrentMediaItemIndex);
 
     ControllerInfo maskedControllerInfo =
         new ControllerInfo(
@@ -806,9 +823,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
         queueTimeline.copyWithMovedMediaItems(fromIndex, toIndex, newIndex);
     PlayerInfo maskedPlayerInfo =
         controllerInfo.playerInfo.copyWithTimelineAndMediaItemIndex(
-            newQueueTimeline,
-            newCurrentMediaItemIndex,
-            Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED);
+            newQueueTimeline, newCurrentMediaItemIndex);
 
     ControllerInfo maskedControllerInfo =
         new ControllerInfo(
@@ -1180,43 +1195,11 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
   }
 
   @Override
-  public void setAudioAttributes(AudioAttributes audioAttributes, boolean handleAudioFocus) {
-    Log.w(TAG, "Legacy session doesn't support setting audio attributes remotely");
-  }
-
-  @Override
   public void setPlayWhenReady(boolean playWhenReady) {
-    if (controllerInfo.playerInfo.playWhenReady == playWhenReady) {
-      return;
-    }
-    // Update position and then stop estimating until a new positionInfo arrives from the session.
-    currentPositionMs =
-        MediaUtils.getUpdatedCurrentPositionMs(
-            controllerInfo.playerInfo,
-            currentPositionMs,
-            lastSetPlayWhenReadyCalledTimeMs,
-            getInstance().getTimeDiffMs());
-    lastSetPlayWhenReadyCalledTimeMs = SystemClock.elapsedRealtime();
-    ControllerInfo maskedControllerInfo =
-        new ControllerInfo(
-            controllerInfo.playerInfo.copyWithPlayWhenReady(
-                playWhenReady,
-                Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
-                Player.PLAYBACK_SUPPRESSION_REASON_NONE),
-            controllerInfo.availableSessionCommands,
-            controllerInfo.availablePlayerCommands,
-            controllerInfo.customLayout);
-    updateStateMaskedControllerInfo(
-        maskedControllerInfo,
-        /* discontinuityReason= */ null,
-        /* mediaItemTransitionReason= */ null);
-
-    if (isPrepared() && hasMedia()) {
-      if (playWhenReady) {
-        controllerCompat.getTransportControls().play();
-      } else {
-        controllerCompat.getTransportControls().pause();
-      }
+    if (playWhenReady) {
+      play();
+    } else {
+      pause();
     }
   }
 
@@ -1522,8 +1505,6 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
         mediaItemTransitionReason);
   }
 
-  // Calling deprecated listener callback method for backwards compatibility.
-  @SuppressWarnings("deprecation")
   private void updateControllerInfo(
       boolean notifyConnected,
       LegacyPlayerInfo newLegacyPlayerInfo,
@@ -1543,11 +1524,9 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
       if (!oldControllerInfo.customLayout.equals(newControllerInfo.customLayout)) {
         getInstance()
             .notifyControllerListener(
-                listener -> {
-                  ignoreFuture(
-                      listener.onSetCustomLayout(getInstance(), newControllerInfo.customLayout));
-                  listener.onCustomLayoutChanged(getInstance(), newControllerInfo.customLayout);
-                });
+                listener ->
+                    ignoreFuture(
+                        listener.onSetCustomLayout(getInstance(), newControllerInfo.customLayout)));
       }
       return;
     }
@@ -1557,7 +1536,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
           (listener) ->
               listener.onTimelineChanged(
                   newControllerInfo.playerInfo.timeline,
-                  newControllerInfo.playerInfo.timelineChangeReason));
+                  Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED));
     }
     if (!Util.areEqual(oldLegacyPlayerInfo.queueTitle, newLegacyPlayerInfo.queueTitle)) {
       listeners.queueEvent(
@@ -1676,11 +1655,9 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
     if (!oldControllerInfo.customLayout.equals(newControllerInfo.customLayout)) {
       getInstance()
           .notifyControllerListener(
-              listener -> {
-                ignoreFuture(
-                    listener.onSetCustomLayout(getInstance(), newControllerInfo.customLayout));
-                listener.onCustomLayoutChanged(getInstance(), newControllerInfo.customLayout);
-              });
+              listener ->
+                  ignoreFuture(
+                      listener.onSetCustomLayout(getInstance(), newControllerInfo.customLayout)));
     }
     listeners.flushEvents();
   }
@@ -2233,7 +2210,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
         new SessionPositionInfo(
             /* positionInfo= */ positionInfo,
             /* isPlayingAd= */ isPlayingAd,
-            /* eventTimeMs= */ SystemClock.elapsedRealtime(),
+            /* eventTimeMs= */ C.TIME_UNSET,
             /* durationMs= */ durationMs,
             /* bufferedPositionMs= */ bufferedPositionMs,
             /* bufferedPercentage= */ bufferedPercentage,
@@ -2255,7 +2232,6 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
             /* shuffleModeEnabled= */ shuffleModeEnabled,
             /* videoSize= */ VideoSize.UNKNOWN,
             /* timeline= */ currentTimeline,
-            /* timelineChangeReason= */ PlayerInfo.TIMELINE_CHANGE_REASON_DEFAULT,
             /* playlistMetadata= */ playlistMetadata,
             /* volume= */ 1.0f,
             /* audioAttributes= */ audioAttributes,
@@ -2264,7 +2240,7 @@ import org.checkerframework.checker.initialization.qual.UnderInitialization;
             /* deviceVolume= */ deviceVolume,
             /* deviceMuted= */ deviceMuted,
             /* playWhenReady= */ playWhenReady,
-            /* playWhenReadyChangeReason= */ PlayerInfo.PLAY_WHEN_READY_CHANGE_REASON_DEFAULT,
+            /* playWhenReadyChangedReason= */ PlayerInfo.PLAY_WHEN_READY_CHANGE_REASON_DEFAULT,
             /* playbackSuppressionReason= */ Player.PLAYBACK_SUPPRESSION_REASON_NONE,
             /* playbackState= */ playbackState,
             /* isPlaying= */ isPlaying,

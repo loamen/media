@@ -17,13 +17,11 @@ package androidx.media3.exoplayer.offline;
 
 import static androidx.media3.exoplayer.offline.Download.STOP_REASON_NONE;
 
-import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ServiceInfo;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -912,7 +910,6 @@ public abstract class DownloadService extends Service {
       }
     }
 
-    @SuppressLint("InlinedApi") // Using compile time constant FOREGROUND_SERVICE_TYPE_DATA_SYNC
     private void update() {
       DownloadManager downloadManager =
           Assertions.checkNotNull(downloadManagerHelper).downloadManager;
@@ -920,12 +917,7 @@ public abstract class DownloadService extends Service {
       @RequirementFlags int notMetRequirements = downloadManager.getNotMetRequirements();
       Notification notification = getForegroundNotification(downloads, notMetRequirements);
       if (!notificationDisplayed) {
-        Util.setForegroundServiceNotification(
-            /* service= */ DownloadService.this,
-            notificationId,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-            "dataSync");
+        startForeground(notificationId, notification);
         notificationDisplayed = true;
       } else {
         // Update the notification via NotificationManager rather than by repeatedly calling

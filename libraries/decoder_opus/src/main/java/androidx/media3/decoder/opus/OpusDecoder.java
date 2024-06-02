@@ -229,7 +229,7 @@ public final class OpusDecoder
       int skipBytes = skipSamples * bytesPerSample;
       if (result <= skipBytes) {
         skipSamples -= result / bytesPerSample;
-        outputBuffer.shouldBeSkipped = true;
+        outputBuffer.addFlag(C.BUFFER_FLAG_DECODE_ONLY);
         outputData.position(result);
       } else {
         skipSamples = 0;

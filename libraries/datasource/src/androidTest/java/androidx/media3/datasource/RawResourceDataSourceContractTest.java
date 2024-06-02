@@ -58,22 +58,12 @@ public final class RawResourceDataSourceContractTest extends DataSourceContractT
             .build(),
         // Additional resources using different URI schemes.
         new TestResource.Builder()
-            .setName("android.resource:// with package, type, and name")
+            .setName("android.resource:// with path")
             .setUri(
                 Uri.parse(
                     "android.resource://"
                         + ApplicationProvider.getApplicationContext().getPackageName()
                         + "/raw/resource1"))
-            .setExpectedBytes(RESOURCE_1_DATA)
-            .build(),
-        new TestResource.Builder()
-            .setName("android.resource:// with type and name only")
-            .setUri(Uri.parse("android.resource:///raw/resource1"))
-            .setExpectedBytes(RESOURCE_1_DATA)
-            .build(),
-        new TestResource.Builder()
-            .setName("android.resource:// with name only")
-            .setUri(Uri.parse("android.resource:///resource1"))
             .setExpectedBytes(RESOURCE_1_DATA)
             .build(),
         new TestResource.Builder()

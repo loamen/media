@@ -34,7 +34,6 @@ import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
-import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.MediaFormatUtil;
@@ -45,7 +44,6 @@ import androidx.media3.decoder.DecoderInputBuffer;
 import androidx.media3.effect.DebugTraceUtil;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Objects;
 import org.checkerframework.checker.initialization.qual.UnknownInitialization;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -60,7 +58,6 @@ public final class DefaultCodec implements Codec {
   private static final String TAG = "DefaultCodec";
 
   private final BufferInfo outputBufferInfo;
-
   /** The {@link MediaFormat} used to configure the underlying {@link MediaCodec}. */
   private final MediaFormat configurationMediaFormat;
 
@@ -73,6 +70,7 @@ public final class DefaultCodec implements Codec {
 
   private @MonotonicNonNull Format outputFormat;
   @Nullable private ByteBuffer outputBuffer;
+
   private int inputBufferIndex;
   private int outputBufferIndex;
   private boolean inputStreamEnded;
@@ -154,7 +152,9 @@ public final class DefaultCodec implements Codec {
     }
     this.mediaCodec = mediaCodec;
     this.inputSurface = inputSurface;
-    maxPendingFrameCount = Util.getMaxPendingFramesCountForMediaCodecDecoders(context);
+    maxPendingFrameCount =
+        Util.getMaxPendingFramesCountForMediaCodecDecoders(
+            context, mediaCodecName, requestedHdrToneMapping);
   }
 
   @Override
@@ -207,30 +207,20 @@ public final class DefaultCodec implements Codec {
 
     int offset = 0;
     int size = 0;
-    int flags = 0;
     if (inputBuffer.data != null && inputBuffer.data.hasRemaining()) {
       offset = inputBuffer.data.position();
       size = inputBuffer.data.remaining();
     }
-    long timestampUs = inputBuffer.timeUs;
-
+    int flags = 0;
     if (inputBuffer.isEndOfStream()) {
       inputStreamEnded = true;
       flags = MediaCodec.BUFFER_FLAG_END_OF_STREAM;
-
-      if (isDecoder) {
-        if (isVideo) {
-          DebugTraceUtil.logEvent(DebugTraceUtil.EVENT_DECODER_RECEIVE_EOS, C.TIME_END_OF_SOURCE);
-        }
-        // EOS buffer on the decoder input should never carry data.
-        checkState(inputBuffer.data == null || !inputBuffer.data.hasRemaining());
-        offset = 0;
-        size = 0;
-        timestampUs = 0;
+      if (isVideo && isDecoder) {
+        DebugTraceUtil.recordDecoderReceiveEos();
       }
     }
     try {
-      mediaCodec.queueInputBuffer(inputBufferIndex, offset, size, timestampUs, flags);
+      mediaCodec.queueInputBuffer(inputBufferIndex, offset, size, inputBuffer.timeUs, flags);
     } catch (RuntimeException e) {
       Log.d(TAG, "MediaCodec error", e);
       throw createExportException(e);
@@ -241,7 +231,7 @@ public final class DefaultCodec implements Codec {
 
   @Override
   public void signalEndOfInputStream() throws ExportException {
-    DebugTraceUtil.logEvent(DebugTraceUtil.EVENT_ENCODER_RECEIVE_EOS, C.TIME_END_OF_SOURCE);
+    DebugTraceUtil.recordEncoderReceiveEos();
     try {
       mediaCodec.signalEndOfInputStream();
     } catch (RuntimeException e) {
@@ -280,12 +270,7 @@ public final class DefaultCodec implements Codec {
     releaseOutputBuffer(/* render= */ true, renderPresentationTimeUs);
   }
 
-  /**
-   * Releases the output buffer at {@code renderPresentationTimeUs} if {@code render} is {@code
-   * true}, otherwise release the buffer without rendering.
-   */
-  @VisibleForTesting
-  protected void releaseOutputBuffer(boolean render, long renderPresentationTimeUs)
+  private void releaseOutputBuffer(boolean render, long renderPresentationTimeUs)
       throws ExportException {
     outputBuffer = null;
     try {
@@ -359,8 +344,7 @@ public final class DefaultCodec implements Codec {
     }
     if (outputBufferIndex < 0) {
       if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-        outputFormat =
-            convertToFormat(mediaCodec.getOutputFormat(), isDecoder, configurationFormat.metadata);
+        outputFormat = convertToFormat(mediaCodec.getOutputFormat(), isDecoder);
       }
       return false;
     }
@@ -411,14 +395,17 @@ public final class DefaultCodec implements Codec {
     return ExportException.createForCodec(cause, errorCode, isVideo, isDecoder, codecDetails);
   }
 
-  private static Format convertToFormat(
-      MediaFormat mediaFormat, boolean isDecoder, @Nullable Metadata metadata) {
-    Format format = MediaFormatUtil.createFormatFromMediaFormat(mediaFormat);
-    Format.Builder formatBuilder = format.buildUpon().setMetadata(metadata);
+  private static Format convertToFormat(MediaFormat mediaFormat, boolean isDecoder) {
+    Format.Builder formatBuilder =
+        MediaFormatUtil.createFormatFromMediaFormat(mediaFormat).buildUpon();
+    if (isDecoder) {
+      // TODO(b/178685617): Restrict this to only set the PCM encoding for audio/raw once we have
+      // a way to simulate more realistic codec input/output formats in tests.
 
-    if (isDecoder
-        && format.pcmEncoding == Format.NO_VALUE
-        && Objects.equals(format.sampleMimeType, MimeTypes.AUDIO_RAW)) {
+      // With Robolectric, codecs do not actually encode/decode. The format of buffers is passed
+      // through. However downstream components need to know the PCM encoding of the data being
+      // output, so if a decoder is not outputting raw audio, we need to set the PCM
+      // encoding to the default.
       formatBuilder.setPcmEncoding(DEFAULT_PCM_ENCODING);
     }
     return formatBuilder.build();

@@ -49,7 +49,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.ColorInt;
-import androidx.annotation.DoNotInline;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -216,10 +215,8 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
 
   /** No artwork is shown. */
   @UnstableApi public static final int ARTWORK_DISPLAY_MODE_OFF = 0;
-
   /** The artwork is fit into the player view and centered creating a letterbox style. */
   @UnstableApi public static final int ARTWORK_DISPLAY_MODE_FIT = 1;
-
   /**
    * The artwork covers the entire space of the player view. If the aspect ratio of the image is
    * different than the player view some areas of the image are cropped.
@@ -236,16 +233,13 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
   @Target(TYPE_USE)
   @IntDef({SHOW_BUFFERING_NEVER, SHOW_BUFFERING_WHEN_PLAYING, SHOW_BUFFERING_ALWAYS})
   public @interface ShowBuffering {}
-
   /** The buffering view is never shown. */
   @UnstableApi public static final int SHOW_BUFFERING_NEVER = 0;
-
   /**
    * The buffering view is shown when the player is in the {@link Player#STATE_BUFFERING buffering}
    * state and {@link Player#getPlayWhenReady() playWhenReady} is {@code true}.
    */
   @UnstableApi public static final int SHOW_BUFFERING_WHEN_PLAYING = 1;
-
   /**
    * The buffering view is always shown when the player is in the {@link Player#STATE_BUFFERING
    * buffering} state.
@@ -428,11 +422,7 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
           }
           break;
         default:
-          SurfaceView view = new SurfaceView(context);
-          if (Util.SDK_INT >= 34) {
-            Api34.setSurfaceLifecycleToFollowsAttachment(view);
-          }
-          surfaceView = view;
+          surfaceView = new SurfaceView(context);
           break;
       }
       surfaceView.setLayoutParams(params);
@@ -594,8 +584,7 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
         } else if (surfaceView instanceof SurfaceView) {
           player.setVideoSurfaceView((SurfaceView) surfaceView);
         }
-        if (!player.isCommandAvailable(COMMAND_GET_TRACKS)
-            || player.getCurrentTracks().isTypeSupported(C.TRACK_TYPE_VIDEO)) {
+        if (player.getCurrentTracks().isTypeSupported(C.TRACK_TYPE_VIDEO)) {
           // If the player already is or was playing a video, onVideoSizeChanged isn't called.
           updateAspectRatio();
         }
@@ -1118,30 +1107,14 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
   }
 
   /**
-   * @deprecated Replace multi-window time bar display by merging source windows together instead,
-   *     for example using ExoPlayer's {@code ConcatenatingMediaSource2}.
+   * Sets whether the time bar should show all windows, as opposed to just the current one.
+   *
+   * @param showMultiWindowTimeBar Whether to show all windows.
    */
-  @SuppressWarnings("deprecation") // Forwarding to deprecated method.
-  @Deprecated
   @UnstableApi
   public void setShowMultiWindowTimeBar(boolean showMultiWindowTimeBar) {
     Assertions.checkStateNotNull(controller);
     controller.setShowMultiWindowTimeBar(showMultiWindowTimeBar);
-  }
-
-  /**
-   * Sets whether a play button is shown if playback is {@linkplain
-   * Player#getPlaybackSuppressionReason() suppressed}.
-   *
-   * <p>The default is {@code true}.
-   *
-   * @param showPlayButtonIfSuppressed Whether to show a play button if playback is {@linkplain
-   *     Player#getPlaybackSuppressionReason() suppressed}.
-   */
-  @UnstableApi
-  public void setShowPlayButtonIfPlaybackIsSuppressed(boolean showPlayButtonIfSuppressed) {
-    Assertions.checkStateNotNull(controller);
-    controller.setShowPlayButtonIfPlaybackIsSuppressed(showPlayButtonIfSuppressed);
   }
 
   /**
@@ -1740,15 +1713,6 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
       if (fullscreenButtonClickListener != null) {
         fullscreenButtonClickListener.onFullscreenButtonClick(isFullScreen);
       }
-    }
-  }
-
-  @RequiresApi(34)
-  private static class Api34 {
-
-    @DoNotInline
-    public static void setSurfaceLifecycleToFollowsAttachment(SurfaceView surfaceView) {
-      surfaceView.setSurfaceLifecycle(SurfaceView.SURFACE_LIFECYCLE_FOLLOWS_ATTACHMENT);
     }
   }
 }

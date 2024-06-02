@@ -71,8 +71,7 @@ public class SubtitleViewUtilsTest {
     RubySpan expectedRubySpan = originalText.getSpans(0, originalText.length(), RubySpan.class)[0];
     assertThat(strippedText)
         .hasRubySpanBetween(
-            originalText.getSpanStart(expectedRubySpan), originalText.getSpanEnd(expectedRubySpan))
-        .withTextAndPosition(expectedRubySpan.rubyText, expectedRubySpan.position);
+            originalText.getSpanStart(expectedRubySpan), originalText.getSpanEnd(expectedRubySpan));
     HorizontalTextInVerticalContextSpan expectedHorizontalTextInVerticalContextSpan =
         originalText
             .getSpans(0, originalText.length(), HorizontalTextInVerticalContextSpan.class)[0];
@@ -118,8 +117,7 @@ public class SubtitleViewUtilsTest {
     RubySpan expectedRubySpan = originalText.getSpans(0, originalText.length(), RubySpan.class)[0];
     assertThat(strippedText)
         .hasRubySpanBetween(
-            originalText.getSpanStart(expectedRubySpan), originalText.getSpanEnd(expectedRubySpan))
-        .withTextAndPosition(expectedRubySpan.rubyText, expectedRubySpan.position);
+            originalText.getSpanStart(expectedRubySpan), originalText.getSpanEnd(expectedRubySpan));
     HorizontalTextInVerticalContextSpan expectedHorizontalTextInVerticalContextSpan =
         originalText
             .getSpans(0, originalText.length(), HorizontalTextInVerticalContextSpan.class)[0];

@@ -23,10 +23,8 @@ import static com.google.common.truth.Truth.assertThat;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.decoder.DecoderInputBuffer;
 import androidx.media3.exoplayer.FormatHolder;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
@@ -39,6 +37,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -89,7 +88,7 @@ public final class MergingMediaPeriodTest {
         streams,
         /* streamResetFlags= */ new boolean[] {false, false, false, false},
         /* positionUs= */ 0);
-    mergingMediaPeriod.continueLoading(new LoadingInfo.Builder().setPlaybackPositionUs(0).build());
+    mergingMediaPeriod.continueLoading(/* positionUs= */ 0);
 
     assertThat(streams[0]).isNull();
     assertThat(streams[3]).isNull();
@@ -134,7 +133,7 @@ public final class MergingMediaPeriodTest {
         streams,
         /* streamResetFlags= */ new boolean[] {false, false},
         /* positionUs= */ 0);
-    mergingMediaPeriod.continueLoading(new LoadingInfo.Builder().setPlaybackPositionUs(0).build());
+    mergingMediaPeriod.continueLoading(/* positionUs= */ 0);
     FormatHolder formatHolder = new FormatHolder();
     DecoderInputBuffer inputBuffer =
         new DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_NORMAL);
@@ -220,7 +219,7 @@ public final class MergingMediaPeriodTest {
         streams,
         /* streamResetFlags= */ new boolean[2],
         /* positionUs= */ 0);
-    mergingMediaPeriod.continueLoading(new LoadingInfo.Builder().setPlaybackPositionUs(0).build());
+    mergingMediaPeriod.continueLoading(/* positionUs= */ 0);
 
     FormatHolder formatHolder = new FormatHolder();
     DecoderInputBuffer inputBuffer =
@@ -267,8 +266,7 @@ public final class MergingMediaPeriodTest {
 
           @Override
           public void onContinueLoadingRequested(MediaPeriod source) {
-            mergingMediaPeriod.continueLoading(
-                new LoadingInfo.Builder().setPlaybackPositionUs(0).build());
+            mergingMediaPeriod.continueLoading(/* positionUs= */ 0);
           }
         },
         /* positionUs= */ 0);

@@ -15,8 +15,9 @@
  */
 package androidx.media3.effect;
 
+import static androidx.media3.common.util.Assertions.checkState;
+
 import androidx.annotation.CallSuper;
-import androidx.media3.common.C;
 import androidx.media3.common.GlObjectsProvider;
 import androidx.media3.common.GlTextureInfo;
 import androidx.media3.common.VideoFrameProcessingException;
@@ -36,36 +37,35 @@ import java.util.concurrent.Executor;
  * into an output frame, with changes to pixels specific to the implementation.
  *
  * <p>{@code BaseShaderProgram} implementations can produce any number of output frames per input
- * frame with the same presentation timestamp.
+ * frame with the same presentation timestamp. {@link SingleFrameGlShaderProgram} can be used to
+ * implement a {@link GlShaderProgram} that produces exactly one output frame per input frame.
  *
  * <p>All methods in this class must be called on the thread that owns the OpenGL context.
  */
 @UnstableApi
 public abstract class BaseGlShaderProgram implements GlShaderProgram {
-  protected final TexturePool outputTexturePool;
-  private InputListener inputListener;
+  private final TexturePool outputTexturePool;
+  protected InputListener inputListener;
   private OutputListener outputListener;
   private ErrorListener errorListener;
   private Executor errorListenerExecutor;
-  private int inputWidth;
-  private int inputHeight;
+  private boolean frameProcessingStarted;
 
   /**
    * Creates a {@code BaseGlShaderProgram} instance.
    *
-   * @param useHighPrecisionColorComponents If {@code false}, uses colors with 8-bit unsigned bytes.
-   *     If {@code true}, use 16-bit (half-precision) floating-point.
+   * @param useHdr Whether input textures come from an HDR source. If {@code true}, colors will be
+   *     in linear RGB BT.2020. If {@code false}, colors will be in linear RGB BT.709.
    * @param texturePoolCapacity The capacity of the texture pool. For example, if implementing a
    *     texture cache, the size should be the number of textures to cache.
    */
-  public BaseGlShaderProgram(boolean useHighPrecisionColorComponents, int texturePoolCapacity) {
-    outputTexturePool = new TexturePool(useHighPrecisionColorComponents, texturePoolCapacity);
+  public BaseGlShaderProgram(boolean useHdr, int texturePoolCapacity) {
+    outputTexturePool =
+        new TexturePool(/* useHighPrecisionColorComponents= */ useHdr, texturePoolCapacity);
     inputListener = new InputListener() {};
     outputListener = new OutputListener() {};
     errorListener = (frameProcessingException) -> {};
     errorListenerExecutor = MoreExecutors.directExecutor();
-    inputWidth = C.LENGTH_UNSET;
-    inputHeight = C.LENGTH_UNSET;
   }
 
   /**
@@ -118,38 +118,30 @@ public abstract class BaseGlShaderProgram implements GlShaderProgram {
     this.errorListener = errorListener;
   }
 
-  /**
-   * Returns {@code true} if the texture buffer should be cleared before calling {@link #drawFrame}
-   * or {@code false} if it should retain the content of the last drawn frame.
-   */
-  public boolean shouldClearTextureBuffer() {
-    return true;
+  @Override
+  public void setGlObjectsProvider(GlObjectsProvider glObjectsProvider) {
+    checkState(
+        !frameProcessingStarted,
+        "The GlObjectsProvider cannot be set after frame processing has started.");
+    outputTexturePool.setGlObjectsProvider(glObjectsProvider);
   }
 
   @Override
-  public void queueInputFrame(
-      GlObjectsProvider glObjectsProvider, GlTextureInfo inputTexture, long presentationTimeUs) {
+  public void queueInputFrame(GlTextureInfo inputTexture, long presentationTimeUs) {
     try {
-      if (inputWidth != inputTexture.width
-          || inputHeight != inputTexture.height
-          || !outputTexturePool.isConfigured()) {
-        inputWidth = inputTexture.width;
-        inputHeight = inputTexture.height;
-        Size outputTextureSize = configure(inputTexture.width, inputTexture.height);
-        outputTexturePool.ensureConfigured(
-            glObjectsProvider, outputTextureSize.getWidth(), outputTextureSize.getHeight());
-      }
+      Size outputTextureSize = configure(inputTexture.getWidth(), inputTexture.getHeight());
+      outputTexturePool.ensureConfigured(
+          outputTextureSize.getWidth(), outputTextureSize.getHeight());
+      frameProcessingStarted = true;
 
       // Focus on the next free buffer.
       GlTextureInfo outputTexture = outputTexturePool.useTexture();
 
       // Copy frame to fbo.
       GlUtil.focusFramebufferUsingCurrentContext(
-          outputTexture.fboId, outputTexture.width, outputTexture.height);
-      if (shouldClearTextureBuffer()) {
-        GlUtil.clearFocusedBuffers();
-      }
-      drawFrame(inputTexture.texId, presentationTimeUs);
+          outputTexture.getFboId(), outputTexture.getWidth(), outputTexture.getHeight());
+      GlUtil.clearOutputFrame();
+      drawFrame(inputTexture.getTexId(), presentationTimeUs);
       inputListener.onInputFrameProcessed(inputTexture);
       outputListener.onOutputFrameAvailable(outputTexture, presentationTimeUs);
     } catch (VideoFrameProcessingException | GlUtil.GlException | NoSuchElementException e) {
@@ -160,18 +152,21 @@ public abstract class BaseGlShaderProgram implements GlShaderProgram {
 
   @Override
   public void releaseOutputFrame(GlTextureInfo outputTexture) {
+    frameProcessingStarted = true;
     outputTexturePool.freeTexture(outputTexture);
     inputListener.onReadyToAcceptInputFrame();
   }
 
   @Override
   public void signalEndOfCurrentInputStream() {
+    frameProcessingStarted = true;
     outputListener.onCurrentOutputStreamEnded();
   }
 
   @Override
   @CallSuper
   public void flush() {
+    frameProcessingStarted = true;
     outputTexturePool.freeAllTextures();
     inputListener.onFlush();
     for (int i = 0; i < outputTexturePool.capacity(); i++) {
@@ -182,23 +177,11 @@ public abstract class BaseGlShaderProgram implements GlShaderProgram {
   @Override
   @CallSuper
   public void release() throws VideoFrameProcessingException {
+    frameProcessingStarted = true;
     try {
       outputTexturePool.deleteAllTextures();
     } catch (GlUtil.GlException e) {
       throw new VideoFrameProcessingException(e);
     }
-  }
-
-  protected final InputListener getInputListener() {
-    return inputListener;
-  }
-
-  protected final OutputListener getOutputListener() {
-    return outputListener;
-  }
-
-  protected final void onError(Exception e) {
-    errorListenerExecutor.execute(
-        () -> errorListener.onError(VideoFrameProcessingException.from(e)));
   }
 }

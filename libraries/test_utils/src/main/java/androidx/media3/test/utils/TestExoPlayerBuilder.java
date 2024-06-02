@@ -55,7 +55,6 @@ public class TestExoPlayerBuilder {
   private long seekBackIncrementMs;
   private long seekForwardIncrementMs;
   private boolean deviceVolumeControlEnabled;
-  private boolean suppressPlaybackWhenUnsuitableOutput;
 
   public TestExoPlayerBuilder(Context context) {
     this.context = context;
@@ -302,20 +301,6 @@ public class TestExoPlayerBuilder {
     return seekForwardIncrementMs;
   }
 
-  /**
-   * See {@link ExoPlayer.Builder#setSuppressPlaybackOnUnsuitableOutput(boolean)} for details.
-   *
-   * @param suppressPlaybackOnUnsuitableOutput Whether the player should suppress the playback when
-   *     it is attempted on an unsuitable output.
-   * @return This builder.
-   */
-  @CanIgnoreReturnValue
-  public TestExoPlayerBuilder setSuppressPlaybackOnUnsuitableOutput(
-      boolean suppressPlaybackOnUnsuitableOutput) {
-    this.suppressPlaybackWhenUnsuitableOutput = suppressPlaybackOnUnsuitableOutput;
-    return this;
-  }
-
   /** Builds an {@link ExoPlayer} using the provided values or their defaults. */
   public ExoPlayer build() {
     Assertions.checkNotNull(
@@ -352,8 +337,7 @@ public class TestExoPlayerBuilder {
             .setLooper(looper)
             .setSeekBackIncrementMs(seekBackIncrementMs)
             .setSeekForwardIncrementMs(seekForwardIncrementMs)
-            .setDeviceVolumeControlEnabled(deviceVolumeControlEnabled)
-            .setSuppressPlaybackOnUnsuitableOutput(suppressPlaybackWhenUnsuitableOutput);
+            .setDeviceVolumeControlEnabled(deviceVolumeControlEnabled);
     if (mediaSourceFactory != null) {
       builder.setMediaSourceFactory(mediaSourceFactory);
     }

@@ -21,7 +21,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import androidx.media3.common.Metadata;
-import androidx.media3.common.util.Util;
 import androidx.media3.extractor.metadata.MetadataInputBuffer;
 import androidx.media3.test.utils.TestUtil;
 import androidx.test.core.app.ApplicationProvider;
@@ -85,7 +84,7 @@ public final class AppInfoTableDecoderTest {
   public void decode_failsIfBufferHasNoArray() {
     AppInfoTableDecoder decoder = new AppInfoTableDecoder();
     MetadataInputBuffer buffer = createMetadataInputBuffer(createByteArray(1, 2, 3));
-    buffer.data = Util.createReadOnlyByteBuffer(buffer.data);
+    buffer.data = buffer.data.asReadOnlyBuffer();
 
     assertThrows(IllegalArgumentException.class, () -> decoder.decode(buffer));
   }

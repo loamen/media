@@ -45,19 +45,14 @@ public final class Log {
   @Target(TYPE_USE)
   @IntDef({LOG_LEVEL_ALL, LOG_LEVEL_INFO, LOG_LEVEL_WARNING, LOG_LEVEL_ERROR, LOG_LEVEL_OFF})
   public @interface LogLevel {}
-
   /** Log level to log all messages. */
   public static final int LOG_LEVEL_ALL = 0;
-
   /** Log level to only log informative, warning and error messages. */
   public static final int LOG_LEVEL_INFO = 1;
-
   /** Log level to only log warning and error messages. */
   public static final int LOG_LEVEL_WARNING = 2;
-
   /** Log level to only log error messages. */
   public static final int LOG_LEVEL_ERROR = 3;
-
   /** Log level to disable all logging. */
   public static final int LOG_LEVEL_OFF = Integer.MAX_VALUE;
 
@@ -72,61 +67,57 @@ public final class Log {
     Logger DEFAULT =
         new Logger() {
           @Override
-          public void d(String tag, String message, @Nullable Throwable throwable) {
-            android.util.Log.d(tag, appendThrowableString(message, throwable));
+          public void d(String tag, String message) {
+            android.util.Log.d(tag, message);
           }
 
           @Override
-          public void i(String tag, String message, @Nullable Throwable throwable) {
-            android.util.Log.i(tag, appendThrowableString(message, throwable));
+          public void i(String tag, String message) {
+            android.util.Log.i(tag, message);
           }
 
           @Override
-          public void w(String tag, String message, @Nullable Throwable throwable) {
-            android.util.Log.w(tag, appendThrowableString(message, throwable));
+          public void w(String tag, String message) {
+            android.util.Log.w(tag, message);
           }
 
           @Override
-          public void e(String tag, String message, @Nullable Throwable throwable) {
-            android.util.Log.e(tag, appendThrowableString(message, throwable));
+          public void e(String tag, String message) {
+            android.util.Log.e(tag, message);
           }
         };
 
     /**
-     * Logs a debug-level message with an optional associated {@link Throwable}.
+     * Logs a debug-level message.
      *
      * @param tag The tag of the message.
      * @param message The message.
-     * @param throwable The {@link Throwable} associated with the message, or null if not specified.
      */
-    void d(String tag, String message, @Nullable Throwable throwable);
+    void d(String tag, String message);
 
     /**
-     * Logs an information-level message with an optional associated {@link Throwable}.
+     * Logs an information-level message.
      *
      * @param tag The tag of the message.
      * @param message The message.
-     * @param throwable The {@link Throwable} associated with the message, or null if not specified.
      */
-    void i(String tag, String message, @Nullable Throwable throwable);
+    void i(String tag, String message);
 
     /**
-     * Logs a warning-level message with an optional associated {@link Throwable}.
+     * Logs a warning-level message.
      *
      * @param tag The tag of the message.
      * @param message The message.
-     * @param throwable The {@link Throwable} associated with the message, or null if not specified.
      */
-    void w(String tag, String message, @Nullable Throwable throwable);
+    void w(String tag, String message);
 
     /**
-     * Logs an error-level message with an optional associated {@link Throwable}.
+     * Logs an error-level message.
      *
      * @param tag The tag of the message.
      * @param message The message.
-     * @param throwable The {@link Throwable} associated with the message, or null if not specified.
      */
-    void e(String tag, String message, @Nullable Throwable throwable);
+    void e(String tag, String message);
   }
 
   private static final Object lock = new Object();
@@ -185,127 +176,83 @@ public final class Log {
   }
 
   /**
-   * Logs a debug-level message.
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
+   * @see android.util.Log#d(String, String)
    */
   @Pure
   public static void d(@Size(max = 23) String tag, String message) {
     synchronized (lock) {
       if (logLevel == LOG_LEVEL_ALL) {
-        logger.d(tag, message, /* throwable= */ null);
+        logger.d(tag, message);
       }
     }
   }
 
   /**
-   * Logs a debug-level message with an optional associated {@link Throwable}.
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
-   * @param throwable The {@link Throwable} associated with the message, or null if not specified.
+   * @see android.util.Log#d(String, String, Throwable)
    */
   @Pure
   public static void d(@Size(max = 23) String tag, String message, @Nullable Throwable throwable) {
-    synchronized (lock) {
-      if (logLevel == LOG_LEVEL_ALL) {
-        logger.d(tag, message, throwable);
-      }
-    }
+    d(tag, appendThrowableString(message, throwable));
   }
 
   /**
-   * Logs an information-level message.
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
+   * @see android.util.Log#i(String, String)
    */
   @Pure
   public static void i(@Size(max = 23) String tag, String message) {
     synchronized (lock) {
       if (logLevel <= LOG_LEVEL_INFO) {
-        logger.i(tag, message, /* throwable= */ null);
+        logger.i(tag, message);
       }
     }
   }
 
   /**
-   * Logs an information-level message with an optional associated {@link Throwable}.
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
-   * @param throwable The {@link Throwable} associated with the message, or null if not specified.
+   * @see android.util.Log#i(String, String, Throwable)
    */
   @Pure
   public static void i(@Size(max = 23) String tag, String message, @Nullable Throwable throwable) {
-    synchronized (lock) {
-      if (logLevel <= LOG_LEVEL_INFO) {
-        logger.i(tag, message, throwable);
-      }
-    }
+    i(tag, appendThrowableString(message, throwable));
   }
 
   /**
-   * Logs a warning-level message.
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
+   * @see android.util.Log#w(String, String)
    */
   @Pure
   public static void w(@Size(max = 23) String tag, String message) {
     synchronized (lock) {
       if (logLevel <= LOG_LEVEL_WARNING) {
-        logger.w(tag, message, /* throwable= */ null);
+        logger.w(tag, message);
       }
     }
   }
 
   /**
-   * Logs a warning-level message with an optional associated {@link Throwable}..
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
-   * @param throwable The {@link Throwable} associated with the message, or null if not specified.
+   * @see android.util.Log#w(String, String, Throwable)
    */
   @Pure
   public static void w(@Size(max = 23) String tag, String message, @Nullable Throwable throwable) {
-    synchronized (lock) {
-      if (logLevel <= LOG_LEVEL_WARNING) {
-        logger.w(tag, message, throwable);
-      }
-    }
+    w(tag, appendThrowableString(message, throwable));
   }
 
   /**
-   * Logs an error-level message.
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
+   * @see android.util.Log#e(String, String)
    */
   @Pure
   public static void e(@Size(max = 23) String tag, String message) {
     synchronized (lock) {
       if (logLevel <= LOG_LEVEL_ERROR) {
-        logger.e(tag, message, /* throwable= */ null);
+        logger.e(tag, message);
       }
     }
   }
 
   /**
-   * Logs an error-level message with an optional associated {@link Throwable}.
-   *
-   * @param tag The tag of the message.
-   * @param message The message.
-   * @param throwable The {@link Throwable} associated with the message, or null if not specified.
+   * @see android.util.Log#e(String, String, Throwable)
    */
   @Pure
   public static void e(@Size(max = 23) String tag, String message, @Nullable Throwable throwable) {
-    synchronized (lock) {
-      if (logLevel <= LOG_LEVEL_ERROR) {
-        logger.e(tag, message, throwable);
-      }
-    }
+    e(tag, appendThrowableString(message, throwable));
   }
 
   /**
@@ -317,17 +264,15 @@ public final class Log {
    * to avoid log spam.
    *
    * @param throwable The {@link Throwable}.
-   * @return The string representation of the {@link Throwable}, or null if {@code throwable} is
-   *     null.
+   * @return The string representation of the {@link Throwable}.
    */
   @Nullable
   @Pure
   public static String getThrowableString(@Nullable Throwable throwable) {
-    if (throwable == null) {
-      return null;
-    }
     synchronized (lock) {
-      if (isCausedByUnknownHostException(throwable)) {
+      if (throwable == null) {
+        return null;
+      } else if (isCausedByUnknownHostException(throwable)) {
         // UnknownHostException implies the device doesn't have network connectivity.
         // UnknownHostException.getMessage() may return a string that's more verbose than desired
         // for
@@ -344,11 +289,8 @@ public final class Log {
     }
   }
 
-  /**
-   * Appends the result of {@link #getThrowableString(Throwable)} (if non-empty) to {@code message}.
-   */
   @Pure
-  public static String appendThrowableString(String message, @Nullable Throwable throwable) {
+  private static String appendThrowableString(String message, @Nullable Throwable throwable) {
     @Nullable String throwableString = getThrowableString(throwable);
     if (!TextUtils.isEmpty(throwableString)) {
       message += "\n  " + throwableString.replace("\n", "\n  ") + '\n';

@@ -39,15 +39,10 @@ public final class DefaultGlObjectsProvider implements GlObjectsProvider {
 
   private final EGLContext sharedEglContext;
 
-  /** Creates an instance with no shared EGL context. */
-  public DefaultGlObjectsProvider() {
-    this(/* sharedEglContext= */ null);
-  }
-
   /**
-   * Creates an instance with the specified shared EGL context.
+   * Creates an instance.
    *
-   * @param sharedEglContext The context with which to share data, or {@code null} if none.
+   * @param sharedEglContext The {@link EGLContext} with which to share data.
    */
   public DefaultGlObjectsProvider(@Nullable EGLContext sharedEglContext) {
     this.sharedEglContext = sharedEglContext != null ? sharedEglContext : EGL14.EGL_NO_CONTEXT;
@@ -70,9 +65,10 @@ public final class DefaultGlObjectsProvider implements GlObjectsProvider {
   }
 
   @Override
-  public EGLSurface createFocusedPlaceholderEglSurface(EGLContext eglContext, EGLDisplay eglDisplay)
+  public EGLSurface createFocusedPlaceholderEglSurface(
+      EGLContext eglContext, EGLDisplay eglDisplay, int[] configAttributes)
       throws GlUtil.GlException {
-    return GlUtil.createFocusedPlaceholderEglSurface(eglContext, eglDisplay);
+    return GlUtil.createFocusedPlaceholderEglSurface(eglContext, eglDisplay, configAttributes);
   }
 
   @Override

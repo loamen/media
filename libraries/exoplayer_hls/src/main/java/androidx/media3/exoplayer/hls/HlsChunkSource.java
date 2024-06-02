@@ -27,7 +27,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
-import androidx.media3.common.MimeTypes;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.TimestampAdjuster;
 import androidx.media3.common.util.UriUtil;
@@ -35,7 +34,6 @@ import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.TransferListener;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist;
@@ -50,7 +48,7 @@ import androidx.media3.exoplayer.source.chunk.MediaChunkIterator;
 import androidx.media3.exoplayer.trackselection.BaseTrackSelection;
 import androidx.media3.exoplayer.trackselection.ExoTrackSelection;
 import androidx.media3.exoplayer.upstream.CmcdConfiguration;
-import androidx.media3.exoplayer.upstream.CmcdData;
+import androidx.media3.exoplayer.upstream.CmcdLog;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
@@ -108,10 +106,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   /** Indicates that the chunk is based on a preload hint. */
   public static final int CHUNK_PUBLICATION_STATE_PRELOAD = 0;
-
   /** Indicates that the chunk is definitely published. */
   public static final int CHUNK_PUBLICATION_STATE_PUBLISHED = 1;
-
   /**
    * Indicates that the chunk has been removed from the playlist.
    *
@@ -153,12 +149,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private boolean seenExpectedPlaylistError;
 
   /**
-   * The time at which the last {@link #getNextChunk(LoadingInfo, long, List, boolean,
-   * HlsChunkHolder)} method was called, as measured by {@link SystemClock#elapsedRealtime}.
-   */
-  private long lastChunkRequestRealtimeMs;
-
-  /**
    * @param extractorFactory An {@link HlsExtractorFactory} from which to obtain the extractors for
    *     media chunks.
    * @param playlistTracker The {@link HlsPlaylistTracker} from which to obtain media playlists.
@@ -177,8 +167,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    *     an infinite timeout.
    * @param muxedCaptionFormats List of muxed caption {@link Format}s. Null if no closed caption
    *     information is available in the multivariant playlist.
-   * @param playerId The {@link PlayerId} of the player using this chunk source.
-   * @param cmcdConfiguration The {@link CmcdConfiguration} for this chunk source.
    */
   public HlsChunkSource(
       HlsExtractorFactory extractorFactory,
@@ -201,7 +189,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     this.muxedCaptionFormats = muxedCaptionFormats;
     this.playerId = playerId;
     this.cmcdConfiguration = cmcdConfiguration;
-    this.lastChunkRequestRealtimeMs = C.TIME_UNSET;
     keyCache = new FullSegmentEncryptionKeyCache(KEY_CACHE_SIZE);
     scratchSpace = Util.EMPTY_BYTE_ARRAY;
     liveEdgeInPeriodTimeUs = C.TIME_UNSET;
@@ -373,7 +360,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    * but the end of the stream has not been reached, {@link HlsChunkHolder#playlistUrl} is set to
    * contain the {@link Uri} that refers to the playlist that needs refreshing.
    *
-   * @param loadingInfo The {@link LoadingInfo} when loading request is made.
+   * @param playbackPositionUs The current playback position relative to the period start in
+   *     microseconds. If playback of the period to which this chunk source belongs has not yet
+   *     started, the value will be the starting position in the period minus the duration of any
+   *     media in previous periods still to be played.
    * @param loadPositionUs The current load position relative to the period start in microseconds.
    * @param queue The queue of buffered {@link HlsMediaChunk}s.
    * @param allowEndOfStream Whether {@link HlsChunkHolder#endOfStream} is allowed to be set for
@@ -382,14 +372,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    * @param out A holder to populate.
    */
   public void getNextChunk(
-      LoadingInfo loadingInfo,
+      long playbackPositionUs,
       long loadPositionUs,
       List<HlsMediaChunk> queue,
       boolean allowEndOfStream,
       HlsChunkHolder out) {
     @Nullable HlsMediaChunk previous = queue.isEmpty() ? null : Iterables.getLast(queue);
     int oldTrackIndex = previous == null ? C.INDEX_UNSET : trackGroup.indexOf(previous.trackFormat);
-    long playbackPositionUs = loadingInfo.playbackPositionUs;
     long bufferedDurationUs = loadPositionUs - playbackPositionUs;
     long timeToLiveEdgeUs = resolveTimeToLiveEdgeUs(playbackPositionUs);
     if (previous != null && !independentSegments) {
@@ -489,61 +478,17 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     seenExpectedPlaylistError = false;
     expectedPlaylistUrl = null;
 
-    @Nullable CmcdData.Factory cmcdDataFactory = null;
-    if (cmcdConfiguration != null) {
-      cmcdDataFactory =
-          new CmcdData.Factory(
-                  cmcdConfiguration,
-                  trackSelection,
-                  bufferedDurationUs,
-                  /* playbackRate= */ loadingInfo.playbackSpeed,
-                  /* streamingFormat= */ CmcdData.Factory.STREAMING_FORMAT_HLS,
-                  /* isLive= */ !playlist.hasEndTag,
-                  /* didRebuffer= */ loadingInfo.rebufferedSince(lastChunkRequestRealtimeMs),
-                  /* isBufferEmpty= */ queue.isEmpty())
-              .setObjectType(
-                  getIsMuxedAudioAndVideo()
-                      ? CmcdData.Factory.OBJECT_TYPE_MUXED_AUDIO_AND_VIDEO
-                      : CmcdData.Factory.getObjectType(trackSelection));
-
-      long nextChunkMediaSequence =
-          partIndex == C.LENGTH_UNSET
-              ? (chunkMediaSequence == C.LENGTH_UNSET ? C.LENGTH_UNSET : chunkMediaSequence + 1)
-              : chunkMediaSequence;
-      int nextPartIndex = partIndex == C.LENGTH_UNSET ? C.LENGTH_UNSET : partIndex + 1;
-      SegmentBaseHolder nextSegmentBaseHolder =
-          getNextSegmentHolder(playlist, nextChunkMediaSequence, nextPartIndex);
-      if (nextSegmentBaseHolder != null) {
-        Uri uri = UriUtil.resolveToUri(playlist.baseUri, segmentBaseHolder.segmentBase.url);
-        Uri nextUri = UriUtil.resolveToUri(playlist.baseUri, nextSegmentBaseHolder.segmentBase.url);
-        cmcdDataFactory.setNextObjectRequest(UriUtil.getRelativePath(uri, nextUri));
-
-        String nextRangeRequest = nextSegmentBaseHolder.segmentBase.byteRangeOffset + "-";
-        if (nextSegmentBaseHolder.segmentBase.byteRangeLength != C.LENGTH_UNSET) {
-          nextRangeRequest +=
-              (nextSegmentBaseHolder.segmentBase.byteRangeOffset
-                  + nextSegmentBaseHolder.segmentBase.byteRangeLength);
-        }
-        cmcdDataFactory.setNextRangeRequest(nextRangeRequest);
-      }
-    }
-    lastChunkRequestRealtimeMs = SystemClock.elapsedRealtime();
-
     // Check if the media segment or its initialization segment are fully encrypted.
     @Nullable
     Uri initSegmentKeyUri =
         getFullEncryptionKeyUri(playlist, segmentBaseHolder.segmentBase.initializationSegment);
-    out.chunk =
-        maybeCreateEncryptionChunkFor(
-            initSegmentKeyUri, selectedTrackIndex, /* isInitSegment= */ true, cmcdDataFactory);
+    out.chunk = maybeCreateEncryptionChunkFor(initSegmentKeyUri, selectedTrackIndex);
     if (out.chunk != null) {
       return;
     }
     @Nullable
     Uri mediaSegmentKeyUri = getFullEncryptionKeyUri(playlist, segmentBaseHolder.segmentBase);
-    out.chunk =
-        maybeCreateEncryptionChunkFor(
-            mediaSegmentKeyUri, selectedTrackIndex, /* isInitSegment= */ false, cmcdDataFactory);
+    out.chunk = maybeCreateEncryptionChunkFor(mediaSegmentKeyUri, selectedTrackIndex);
     if (out.chunk != null) {
       return;
     }
@@ -558,6 +503,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       // becomes fully available (or the track selection selects another track).
       return;
     }
+
+    @Nullable
+    CmcdLog cmcdLog =
+        cmcdConfiguration == null
+            ? null
+            : CmcdLog.createInstance(
+                cmcdConfiguration, trackSelection, playbackPositionUs, loadPositionUs);
 
     out.chunk =
         HlsMediaChunk.createInstance(
@@ -579,14 +531,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             /* initSegmentKey= */ keyCache.get(initSegmentKeyUri),
             shouldSpliceIn,
             playerId,
-            cmcdDataFactory);
-  }
-
-  private boolean getIsMuxedAudioAndVideo() {
-    Format format = trackGroup.getFormat(trackSelection.getSelectedIndex());
-    String audioMimeType = MimeTypes.getAudioMediaMimeType(format.codecs);
-    String videoMimeType = MimeTypes.getVideoMediaMimeType(format.codecs);
-    return audioMimeType != null && videoMimeType != null;
+            cmcdLog);
   }
 
   @Nullable
@@ -893,11 +838,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Nullable
-  private Chunk maybeCreateEncryptionChunkFor(
-      @Nullable Uri keyUri,
-      int selectedTrackIndex,
-      boolean isInitSegment,
-      @Nullable CmcdData.Factory cmcdDataFactory) {
+  private Chunk maybeCreateEncryptionChunkFor(@Nullable Uri keyUri, int selectedTrackIndex) {
     if (keyUri == null) {
       return null;
     }
@@ -910,17 +851,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       keyCache.put(keyUri, encryptionKey);
       return null;
     }
-
     DataSpec dataSpec =
         new DataSpec.Builder().setUri(keyUri).setFlags(DataSpec.FLAG_ALLOW_GZIP).build();
-    if (cmcdDataFactory != null) {
-      if (isInitSegment) {
-        cmcdDataFactory.setObjectType(CmcdData.Factory.OBJECT_TYPE_INIT_SEGMENT);
-      }
-      CmcdData cmcdData = cmcdDataFactory.createCmcdData();
-      dataSpec = cmcdData.addToDataSpec(dataSpec);
-    }
-
     return new EncryptionKeyChunk(
         encryptionDataSource,
         dataSpec,

@@ -17,7 +17,10 @@ package androidx.media3.effect;
 
 import static androidx.media3.common.util.Assertions.checkArgument;
 
+import android.content.Context;
 import android.opengl.GLES20;
+import android.opengl.Matrix;
+import android.util.Pair;
 import androidx.media3.common.VideoFrameProcessingException;
 import androidx.media3.common.util.GlProgram;
 import androidx.media3.common.util.GlUtil;
@@ -26,22 +29,32 @@ import androidx.media3.common.util.Util;
 import com.google.common.collect.ImmutableList;
 
 /** Applies zero or more {@link TextureOverlay}s onto each frame. */
-/* package */ final class OverlayShaderProgram extends BaseGlShaderProgram {
+/* package */ final class OverlayShaderProgram extends SingleFrameGlShaderProgram {
+
+  private static final int MATRIX_OFFSET = 0;
 
   private final GlProgram glProgram;
-  private final SamplerOverlayMatrixProvider samplerOverlayMatrixProvider;
   private final ImmutableList<TextureOverlay> overlays;
+  private final float[] aspectRatioMatrix;
+  private final float[] overlayMatrix;
+  private final float[] anchorMatrix;
+  private final float[] transformationMatrix;
+
+  private int videoWidth;
+  private int videoHeight;
 
   /**
    * Creates a new instance.
    *
+   * @param context The {@link Context}.
    * @param useHdr Whether input textures come from an HDR source. If {@code true}, colors will be
    *     in linear RGB BT.2020. If {@code false}, colors will be in linear RGB BT.709.
    * @throws VideoFrameProcessingException If a problem occurs while reading shader files.
    */
-  public OverlayShaderProgram(boolean useHdr, ImmutableList<TextureOverlay> overlays)
+  public OverlayShaderProgram(
+      Context context, boolean useHdr, ImmutableList<TextureOverlay> overlays)
       throws VideoFrameProcessingException {
-    super(/* useHighPrecisionColorComponents= */ useHdr, /* texturePoolCapacity= */ 1);
+    super(useHdr);
     checkArgument(!useHdr, "OverlayShaderProgram does not support HDR colors yet.");
     // The maximum number of samplers allowed in a single GL program is 16.
     // We use one for every overlay and one for the video.
@@ -49,7 +62,10 @@ import com.google.common.collect.ImmutableList;
         overlays.size() <= 15,
         "OverlayShaderProgram does not support more than 15 overlays in the same instance.");
     this.overlays = overlays;
-    this.samplerOverlayMatrixProvider = new SamplerOverlayMatrixProvider();
+    aspectRatioMatrix = GlUtil.create4x4IdentityMatrix();
+    overlayMatrix = GlUtil.create4x4IdentityMatrix();
+    anchorMatrix = GlUtil.create4x4IdentityMatrix();
+    transformationMatrix = GlUtil.create4x4IdentityMatrix();
     try {
       glProgram =
           new GlProgram(createVertexShader(overlays.size()), createFragmentShader(overlays.size()));
@@ -65,8 +81,9 @@ import com.google.common.collect.ImmutableList;
 
   @Override
   public Size configure(int inputWidth, int inputHeight) {
+    videoWidth = inputWidth;
+    videoHeight = inputHeight;
     Size videoSize = new Size(inputWidth, inputHeight);
-    samplerOverlayMatrixProvider.configure(/* backgroundSize= */ videoSize);
     for (TextureOverlay overlay : overlays) {
       overlay.configure(videoSize);
     }
@@ -86,16 +103,51 @@ import com.google.common.collect.ImmutableList;
               Util.formatInvariant("uOverlayTexSampler%d", texUnitIndex),
               overlay.getTextureId(presentationTimeUs),
               texUnitIndex);
-          OverlaySettings overlaySettings = overlay.getOverlaySettings(presentationTimeUs);
-          Size overlaySize = overlay.getTextureSize(presentationTimeUs);
 
+          GlUtil.setToIdentity(aspectRatioMatrix);
+          Matrix.scaleM(
+              aspectRatioMatrix,
+              MATRIX_OFFSET,
+              videoWidth / (float) overlay.getTextureSize(presentationTimeUs).getWidth(),
+              videoHeight / (float) overlay.getTextureSize(presentationTimeUs).getHeight(),
+              /* z= */ 1);
+          Matrix.invertM(
+              overlayMatrix,
+              MATRIX_OFFSET,
+              overlay.getOverlaySettings(presentationTimeUs).matrix,
+              MATRIX_OFFSET);
+          Pair<Float, Float> overlayAnchor = overlay.getOverlaySettings(presentationTimeUs).anchor;
+          GlUtil.setToIdentity(anchorMatrix);
+          Matrix.translateM(
+              anchorMatrix,
+              /* mOffset= */ 0,
+              overlayAnchor.first
+                  * overlay.getTextureSize(presentationTimeUs).getWidth()
+                  / videoWidth,
+              overlayAnchor.second
+                  * overlay.getTextureSize(presentationTimeUs).getHeight()
+                  / videoHeight,
+              /* z= */ 1);
+          Matrix.multiplyMM(
+              transformationMatrix,
+              MATRIX_OFFSET,
+              overlayMatrix,
+              MATRIX_OFFSET,
+              anchorMatrix,
+              MATRIX_OFFSET);
+          Matrix.multiplyMM(
+              transformationMatrix,
+              MATRIX_OFFSET,
+              aspectRatioMatrix,
+              MATRIX_OFFSET,
+              transformationMatrix,
+              MATRIX_OFFSET);
           glProgram.setFloatsUniform(
-              Util.formatInvariant("uTransformationMatrix%d", texUnitIndex),
-              samplerOverlayMatrixProvider.getTransformationMatrix(overlaySize, overlaySettings));
+              Util.formatInvariant("uTransformationMatrix%d", texUnitIndex), transformationMatrix);
 
           glProgram.setFloatUniform(
-              Util.formatInvariant("uOverlayAlphaScale%d", texUnitIndex),
-              overlaySettings.alphaScale);
+              Util.formatInvariant("uOverlayAlpha%d", texUnitIndex),
+              overlay.getOverlaySettings(presentationTimeUs).alpha);
         }
       }
       glProgram.setSamplerTexIdUniform("uVideoTexSampler0", inputTexId, /* texUnitIndex= */ 0);
@@ -115,9 +167,6 @@ import com.google.common.collect.ImmutableList;
       glProgram.delete();
     } catch (GlUtil.GlException e) {
       throw new VideoFrameProcessingException(e);
-    }
-    for (int i = 0; i < overlays.size(); i++) {
-      overlays.get(i).release();
     }
   }
 
@@ -169,13 +218,13 @@ import com.google.common.collect.ImmutableList;
             .append(
                 "// (https://open.gl/textures) since it's not implemented until OpenGL ES 3.2.\n")
             .append("vec4 getClampToBorderOverlayColor(\n")
-            .append("    sampler2D texSampler, vec2 texSamplingCoord, float alphaScale){\n")
+            .append("    sampler2D texSampler, vec2 texSamplingCoord, float alpha){\n")
             .append("  if (texSamplingCoord.x > 1.0 || texSamplingCoord.x < 0.0\n")
             .append("      || texSamplingCoord.y > 1.0 || texSamplingCoord.y < 0.0) {\n")
             .append("    return vec4(0.0, 0.0, 0.0, 0.0);\n")
             .append("  } else {\n")
             .append("    vec4 overlayColor = vec4(texture2D(texSampler, texSamplingCoord));\n")
-            .append("    overlayColor.a = alphaScale * overlayColor.a;\n")
+            .append("    overlayColor.a = alpha * overlayColor.a;\n")
             .append("    return overlayColor;\n")
             .append("  }\n")
             .append("}\n")
@@ -206,7 +255,7 @@ import com.google.common.collect.ImmutableList;
     for (int texUnitIndex = 1; texUnitIndex <= numOverlays; texUnitIndex++) {
       shader
           .append(Util.formatInvariant("uniform sampler2D uOverlayTexSampler%d;\n", texUnitIndex))
-          .append(Util.formatInvariant("uniform float uOverlayAlphaScale%d;\n", texUnitIndex))
+          .append(Util.formatInvariant("uniform float uOverlayAlpha%d;\n", texUnitIndex))
           .append(Util.formatInvariant("varying vec2 vOverlayTexSamplingCoord%d;\n", texUnitIndex));
     }
 
@@ -224,7 +273,7 @@ import com.google.common.collect.ImmutableList;
                   texUnitIndex))
           .append(
               Util.formatInvariant(
-                  "    uOverlayTexSampler%d, vOverlayTexSamplingCoord%d, uOverlayAlphaScale%d);\n",
+                  "    uOverlayTexSampler%d, vOverlayTexSamplingCoord%d, uOverlayAlpha%d);\n",
                   texUnitIndex, texUnitIndex, texUnitIndex))
           .append(Util.formatInvariant("  vec4 opticalOverlayColor%d = vec4(\n", texUnitIndex))
           .append(

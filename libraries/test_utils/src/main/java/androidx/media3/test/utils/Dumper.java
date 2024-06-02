@@ -15,12 +15,9 @@
  */
 package androidx.media3.test.utils;
 
-import static androidx.media3.common.util.Assertions.checkNotNull;
-
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.common.util.Util;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.Arrays;
 import java.util.Locale;
@@ -50,16 +47,7 @@ public final class Dumper {
 
   @CanIgnoreReturnValue
   public Dumper add(String field, @Nullable Object value) {
-    checkNotNull(value);
-    String[] lines = Util.split(value.toString(), "\n");
-    addLine(field + " = " + lines[0]);
-    int fieldValueAdditionalIndent = field.length() + 3;
-    indent += fieldValueAdditionalIndent;
-    for (int i = 1; i < lines.length; i++) {
-      addLine(lines[i]);
-    }
-    indent -= fieldValueAdditionalIndent;
-    return this;
+    return addString(field + " = " + value + '\n');
   }
 
   @CanIgnoreReturnValue
@@ -73,11 +61,11 @@ public final class Dumper {
     String string =
         String.format(
             Locale.US,
-            "%s = length %d, hash %X",
+            "%s = length %d, hash %X\n",
             field,
             value == null ? 0 : value.length,
             Arrays.hashCode(value));
-    return addLine(string);
+    return addString(string);
   }
 
   @CanIgnoreReturnValue
@@ -87,7 +75,7 @@ public final class Dumper {
 
   @CanIgnoreReturnValue
   public Dumper startBlock(String name) {
-    addLine(name + ":");
+    addString(name + ":\n");
     indent += INDENT_SIZE_IN_SPACES;
     return this;
   }
@@ -104,12 +92,11 @@ public final class Dumper {
   }
 
   @CanIgnoreReturnValue
-  private Dumper addLine(String string) {
+  private Dumper addString(String string) {
     for (int i = 0; i < indent; i++) {
       sb.append(' ');
     }
     sb.append(string);
-    sb.append('\n');
     return this;
   }
 }

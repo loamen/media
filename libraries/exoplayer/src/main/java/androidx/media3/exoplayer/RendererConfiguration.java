@@ -15,11 +15,8 @@
  */
 package androidx.media3.exoplayer;
 
-import static androidx.media3.exoplayer.audio.AudioSink.OFFLOAD_MODE_DISABLED;
-
 import androidx.annotation.Nullable;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.exoplayer.audio.AudioSink;
 
 /** The configuration of a {@link Renderer}. */
 @UnstableApi
@@ -27,34 +24,15 @@ public final class RendererConfiguration {
 
   /** The default configuration. */
   public static final RendererConfiguration DEFAULT =
-      new RendererConfiguration(
-          /* offloadModePreferred= */ OFFLOAD_MODE_DISABLED, /* tunneling= */ false);
-
-  /** The offload mode preference with which to configure the renderer. */
-  public final @AudioSink.OffloadMode int offloadModePreferred;
+      new RendererConfiguration(/* tunneling= */ false);
 
   /** Whether to enable tunneling. */
   public final boolean tunneling;
 
   /**
-   * Creates an instance with {@code tunneling} and sets {@link #offloadModePreferred} to {@link
-   * AudioSink#OFFLOAD_MODE_DISABLED}.
-   *
    * @param tunneling Whether to enable tunneling.
    */
   public RendererConfiguration(boolean tunneling) {
-    this.offloadModePreferred = OFFLOAD_MODE_DISABLED;
-    this.tunneling = tunneling;
-  }
-
-  /**
-   * Creates an instance.
-   *
-   * @param offloadModePreferred The offload mode to use.
-   * @param tunneling Whether to enable tunneling.
-   */
-  public RendererConfiguration(@AudioSink.OffloadMode int offloadModePreferred, boolean tunneling) {
-    this.offloadModePreferred = offloadModePreferred;
     this.tunneling = tunneling;
   }
 
@@ -67,13 +45,11 @@ public final class RendererConfiguration {
       return false;
     }
     RendererConfiguration other = (RendererConfiguration) obj;
-    return offloadModePreferred == other.offloadModePreferred && tunneling == other.tunneling;
+    return tunneling == other.tunneling;
   }
 
   @Override
   public int hashCode() {
-    int hashCode = offloadModePreferred << 1;
-    hashCode += (tunneling ? 1 : 0);
-    return hashCode;
+    return tunneling ? 0 : 1;
   }
 }

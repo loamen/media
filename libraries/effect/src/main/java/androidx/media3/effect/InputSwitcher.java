@@ -17,26 +17,19 @@
 
 package androidx.media3.effect;
 
-import static androidx.media3.common.VideoFrameProcessor.INPUT_TYPE_BITMAP;
-import static androidx.media3.common.VideoFrameProcessor.INPUT_TYPE_SURFACE;
-import static androidx.media3.common.VideoFrameProcessor.INPUT_TYPE_TEXTURE_ID;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 import static androidx.media3.common.util.Assertions.checkState;
 import static androidx.media3.common.util.Assertions.checkStateNotNull;
-import static androidx.media3.common.util.Util.contains;
 
 import android.content.Context;
 import android.util.SparseArray;
-import android.view.Surface;
+import androidx.media3.common.C;
 import androidx.media3.common.ColorInfo;
-import androidx.media3.common.FrameInfo;
 import androidx.media3.common.GlObjectsProvider;
 import androidx.media3.common.GlTextureInfo;
-import androidx.media3.common.OnInputFrameProcessedListener;
 import androidx.media3.common.VideoFrameProcessingException;
 import androidx.media3.common.VideoFrameProcessor;
 import com.google.common.collect.ImmutableList;
-import java.util.concurrent.Executor;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
@@ -48,30 +41,27 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private final ColorInfo outputColorInfo;
   private final GlObjectsProvider glObjectsProvider;
   private final VideoFrameProcessingTaskExecutor videoFrameProcessingTaskExecutor;
-  private final GlShaderProgram.ErrorListener samplingShaderProgramErrorListener;
-  private final Executor errorListenerExecutor;
   private final SparseArray<Input> inputs;
   private final boolean enableColorTransfers;
 
   private @MonotonicNonNull GlShaderProgram downstreamShaderProgram;
   private @MonotonicNonNull TextureManager activeTextureManager;
+  private boolean inputEnded;
+  private int activeInputType;
 
   public InputSwitcher(
       Context context,
       ColorInfo outputColorInfo,
       GlObjectsProvider glObjectsProvider,
       VideoFrameProcessingTaskExecutor videoFrameProcessingTaskExecutor,
-      Executor errorListenerExecutor,
-      GlShaderProgram.ErrorListener samplingShaderProgramErrorListener,
       boolean enableColorTransfers) {
     this.context = context;
     this.outputColorInfo = outputColorInfo;
     this.glObjectsProvider = glObjectsProvider;
     this.videoFrameProcessingTaskExecutor = videoFrameProcessingTaskExecutor;
-    this.errorListenerExecutor = errorListenerExecutor;
-    this.samplingShaderProgramErrorListener = samplingShaderProgramErrorListener;
     this.inputs = new SparseArray<>();
     this.enableColorTransfers = enableColorTransfers;
+    activeInputType = C.INDEX_UNSET;
   }
 
   /**
@@ -97,7 +87,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     TextureManager textureManager;
     // TODO(b/274109008): Refactor DefaultShaderProgram to create a class just for sampling.
     switch (inputType) {
-      case INPUT_TYPE_SURFACE:
+      case VideoFrameProcessor.INPUT_TYPE_SURFACE:
         samplingShaderProgram =
             DefaultShaderProgram.createWithExternalSampler(
                 context,
@@ -106,14 +96,12 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
                 inputColorInfo,
                 outputColorInfo,
                 enableColorTransfers);
-        samplingShaderProgram.setErrorListener(
-            errorListenerExecutor, samplingShaderProgramErrorListener);
+        samplingShaderProgram.setGlObjectsProvider(glObjectsProvider);
         textureManager =
-            new ExternalTextureManager(
-                glObjectsProvider, samplingShaderProgram, videoFrameProcessingTaskExecutor);
+            new ExternalTextureManager(samplingShaderProgram, videoFrameProcessingTaskExecutor);
         inputs.put(inputType, new Input(textureManager, samplingShaderProgram));
         break;
-      case INPUT_TYPE_BITMAP:
+      case VideoFrameProcessor.INPUT_TYPE_BITMAP:
         samplingShaderProgram =
             DefaultShaderProgram.createWithInternalSampler(
                 context,
@@ -123,14 +111,12 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
                 outputColorInfo,
                 enableColorTransfers,
                 inputType);
-        samplingShaderProgram.setErrorListener(
-            errorListenerExecutor, samplingShaderProgramErrorListener);
+        samplingShaderProgram.setGlObjectsProvider(glObjectsProvider);
         textureManager =
-            new BitmapTextureManager(
-                glObjectsProvider, samplingShaderProgram, videoFrameProcessingTaskExecutor);
+            new BitmapTextureManager(samplingShaderProgram, videoFrameProcessingTaskExecutor);
         inputs.put(inputType, new Input(textureManager, samplingShaderProgram));
         break;
-      case INPUT_TYPE_TEXTURE_ID:
+      case VideoFrameProcessor.INPUT_TYPE_TEXTURE_ID:
         samplingShaderProgram =
             DefaultShaderProgram.createWithInternalSampler(
                 context,
@@ -140,11 +126,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
                 outputColorInfo,
                 enableColorTransfers,
                 inputType);
-        samplingShaderProgram.setErrorListener(
-            errorListenerExecutor, samplingShaderProgramErrorListener);
+        samplingShaderProgram.setGlObjectsProvider(glObjectsProvider);
         textureManager =
-            new TexIdTextureManager(
-                glObjectsProvider, samplingShaderProgram, videoFrameProcessingTaskExecutor);
+            new TexIdTextureManager(samplingShaderProgram, videoFrameProcessingTaskExecutor);
         inputs.put(inputType, new Input(textureManager, samplingShaderProgram));
         break;
       default:
@@ -152,35 +136,42 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
   }
 
-  /** Sets the {@link GlShaderProgram} that {@code InputSwitcher} outputs to. */
   public void setDownstreamShaderProgram(GlShaderProgram downstreamShaderProgram) {
     this.downstreamShaderProgram = downstreamShaderProgram;
+
+    for (int i = 0; i < inputs.size(); i++) {
+      @VideoFrameProcessor.InputType int inputType = inputs.keyAt(i);
+      Input input = inputs.get(inputType);
+      input.setChainingListener(
+          new GatedChainingListenerWrapper(
+              input.samplingGlShaderProgram,
+              this.downstreamShaderProgram,
+              videoFrameProcessingTaskExecutor));
+    }
   }
 
   /**
    * Switches to a new source of input.
    *
+   * <p>Blocks until the current input stream is processed.
+   *
    * <p>Must be called after the corresponding {@code newInputType} is {@linkplain #registerInput
    * registered}.
    *
    * @param newInputType The new {@link VideoFrameProcessor.InputType} to switch to.
-   * @param inputFrameInfo The {@link FrameInfo} associated with the new input.
    */
-  public void switchToInput(
-      @VideoFrameProcessor.InputType int newInputType, FrameInfo inputFrameInfo) {
+  public void switchToInput(@VideoFrameProcessor.InputType int newInputType) {
     checkStateNotNull(downstreamShaderProgram);
-    checkState(contains(inputs, newInputType), "Input type not registered: " + newInputType);
+    checkState(inputs.indexOfKey(newInputType) >= 0, "Input type not registered: " + newInputType);
+
+    if (newInputType == activeInputType) {
+      activeTextureManager = inputs.get(activeInputType).textureManager;
+    }
 
     for (int i = 0; i < inputs.size(); i++) {
       @VideoFrameProcessor.InputType int inputType = inputs.keyAt(i);
       Input input = inputs.get(inputType);
       if (inputType == newInputType) {
-        input.setChainingListener(
-            new GatedChainingListenerWrapper(
-                glObjectsProvider,
-                input.samplingGlShaderProgram,
-                this.downstreamShaderProgram,
-                videoFrameProcessingTaskExecutor));
         input.setActive(true);
         downstreamShaderProgram.setInputListener(checkNotNull(input.gatedChainingListenerWrapper));
         activeTextureManager = input.textureManager;
@@ -188,65 +179,34 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         input.setActive(false);
       }
     }
-    checkNotNull(activeTextureManager).setInputFrameInfo(inputFrameInfo);
-  }
-
-  /** Returns whether the {@code InputSwitcher} is connected to an active input. */
-  public boolean hasActiveInput() {
-    return activeTextureManager != null;
+    activeInputType = newInputType;
   }
 
   /**
    * Returns the {@link TextureManager} that is currently being used.
    *
-   * @throws IllegalStateException If the {@code InputSwitcher} is not connected to an {@linkplain
-   *     #hasActiveInput() input}.
+   * <p>Must call {@link #switchToInput} before calling this method.
    */
   public TextureManager activeTextureManager() {
-    return checkStateNotNull(activeTextureManager);
+    return checkNotNull(activeTextureManager);
   }
 
   /**
    * Invokes {@link TextureManager#signalEndOfCurrentInputStream} on the active {@link
    * TextureManager}.
    */
-  public void signalEndOfInputStream() {
+  public void signalEndOfCurrentInputStream() {
     checkNotNull(activeTextureManager).signalEndOfCurrentInputStream();
   }
 
-  /**
-   * Returns the input {@link Surface}.
-   *
-   * @return The input {@link Surface}, regardless if the current input is {@linkplain
-   *     #switchToInput set} to {@link VideoFrameProcessor#INPUT_TYPE_SURFACE}.
-   * @throws IllegalStateException If {@link VideoFrameProcessor#INPUT_TYPE_SURFACE} is not
-   *     {@linkplain #registerInput registered}.
-   */
-  public Surface getInputSurface() {
-    checkState(contains(inputs, INPUT_TYPE_SURFACE));
-    return inputs.get(INPUT_TYPE_SURFACE).textureManager.getInputSurface();
-  }
-
-  /**
-   * See {@link DefaultVideoFrameProcessor#setInputDefaultBufferSize}.
-   *
-   * @throws IllegalStateException If {@link VideoFrameProcessor#INPUT_TYPE_SURFACE} is not
-   *     {@linkplain #registerInput registered}.
-   */
-  public void setInputDefaultBufferSize(int width, int height) {
-    checkState(contains(inputs, INPUT_TYPE_SURFACE));
-    inputs.get(INPUT_TYPE_SURFACE).textureManager.setDefaultBufferSize(width, height);
-  }
-
-  /**
-   * Sets the {@link OnInputFrameProcessedListener}.
-   *
-   * @throws IllegalStateException If {@link VideoFrameProcessor#INPUT_TYPE_TEXTURE_ID} is not
-   *     {@linkplain #registerInput registered}.
-   */
-  public void setOnInputFrameProcessedListener(OnInputFrameProcessedListener listener) {
-    checkState(contains(inputs, INPUT_TYPE_TEXTURE_ID));
-    inputs.get(INPUT_TYPE_TEXTURE_ID).textureManager.setOnInputFrameProcessedListener(listener);
+  /** Signals end of input to all {@linkplain #registerInput registered inputs}. */
+  public void signalEndOfInput() {
+    checkState(!inputEnded);
+    inputEnded = true;
+    for (int i = 0; i < inputs.size(); i++) {
+      @VideoFrameProcessor.InputType int inputType = inputs.keyAt(i);
+      inputs.get(inputType).signalEndOfInput();
+    }
   }
 
   /** Releases the resources. */
@@ -280,10 +240,12 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
 
     public void setActive(boolean active) {
-      if (gatedChainingListenerWrapper == null) {
-        return;
-      }
+      checkStateNotNull(gatedChainingListenerWrapper);
       gatedChainingListenerWrapper.setActive(active);
+    }
+
+    public void signalEndOfInput() {
+      textureManager.signalEndOfInput();
     }
 
     public void release() throws VideoFrameProcessingException {
@@ -300,20 +262,15 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       implements GlShaderProgram.OutputListener, GlShaderProgram.InputListener {
 
     private final ChainingGlShaderProgramListener chainingGlShaderProgramListener;
-
-    private boolean isActive;
+    private boolean isActive = false;
 
     public GatedChainingListenerWrapper(
-        GlObjectsProvider glObjectsProvider,
         GlShaderProgram producingGlShaderProgram,
         GlShaderProgram consumingGlShaderProgram,
         VideoFrameProcessingTaskExecutor videoFrameProcessingTaskExecutor) {
       this.chainingGlShaderProgramListener =
           new ChainingGlShaderProgramListener(
-              glObjectsProvider,
-              producingGlShaderProgram,
-              consumingGlShaderProgram,
-              videoFrameProcessingTaskExecutor);
+              producingGlShaderProgram, consumingGlShaderProgram, videoFrameProcessingTaskExecutor);
     }
 
     @Override

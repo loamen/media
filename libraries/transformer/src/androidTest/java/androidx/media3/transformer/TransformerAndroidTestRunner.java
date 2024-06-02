@@ -29,13 +29,12 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.SystemClock;
 import androidx.media3.common.util.Util;
 import androidx.media3.effect.DebugTraceUtil;
-import androidx.media3.test.utils.SsimHelper;
 import androidx.test.platform.app.InstrumentationRegistry;
 import com.google.common.base.Ascii;
+import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.File;
 import java.io.IOException;
@@ -44,6 +43,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.json.JSONObject;
 
 /** An android instrumentation test runner for {@link Transformer}. */
@@ -201,13 +201,10 @@ public class TransformerAndroidTestRunner {
         throw exportTestResult.analysisException;
       }
       return exportTestResult;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      resultJson.put(
-          "exportResult",
-          new JSONObject().put("testException", AndroidTestUtil.exceptionAsJsonObject(e)));
-      throw e;
-    } catch (IOException | TimeoutException | UnsupportedOperationException e) {
+    } catch (InterruptedException
+        | IOException
+        | TimeoutException
+        | UnsupportedOperationException e) {
       resultJson.put(
           "exportResult",
           new JSONObject().put("testException", AndroidTestUtil.exceptionAsJsonObject(e)));
@@ -226,8 +223,9 @@ public class TransformerAndroidTestRunner {
    * @throws Exception The cause of the export not completing.
    */
   public ExportTestResult run(String testId, EditedMediaItem editedMediaItem) throws Exception {
-    Composition composition =
-        new Composition.Builder(new EditedMediaItemSequence(editedMediaItem)).build();
+    EditedMediaItemSequence sequence =
+        new EditedMediaItemSequence(ImmutableList.of(editedMediaItem));
+    Composition composition = new Composition.Builder(ImmutableList.of(sequence)).build();
     return run(testId, composition);
   }
 
@@ -457,7 +455,7 @@ public class TransformerAndroidTestRunner {
   }
 
   private static void logTimeoutDiagnostics() {
-    Log.e(TAG, "Effect debug traces at timeout: " + DebugTraceUtil.generateTraceSummary());
+    Log.e(TAG, "Effect debug traces at timeout: " + DebugTraceUtil.generateTrace());
     Log.e(TAG, "Thread state at timeout:");
     Set<Map.Entry<Thread, StackTraceElement[]>> entries = Thread.getAllStackTraces().entrySet();
     for (Map.Entry<Thread, StackTraceElement[]> threadAndStackTraceElements : entries) {

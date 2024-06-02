@@ -44,7 +44,6 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
 
   /** The number of input and output buffers. */
   private static final int NUM_BUFFERS = 16;
-
   /** The default input buffer size. */
   private static final int DEFAULT_INPUT_BUFFER_SIZE = 960 * 6;
 

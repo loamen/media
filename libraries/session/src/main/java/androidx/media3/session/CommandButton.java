@@ -17,20 +17,15 @@ package androidx.media3.session;
 
 import static androidx.media3.common.util.Assertions.checkArgument;
 import static androidx.media3.common.util.Assertions.checkNotNull;
-import static androidx.media3.common.util.Assertions.checkState;
 
 import android.os.Bundle;
-import android.text.TextUtils;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.media3.common.Bundleable;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
-import com.google.common.base.Objects;
-import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
-import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.List;
 
 /**
@@ -38,7 +33,7 @@ import java.util.List;
  * controllers.
  *
  * @see MediaSession#setCustomLayout(MediaSession.ControllerInfo, List)
- * @see MediaController.Listener#onCustomLayoutChanged(MediaController, List)
+ * @see MediaController.Listener#onSetCustomLayout(MediaController, List)
  */
 public final class CommandButton implements Bundleable {
 
@@ -149,20 +144,17 @@ public final class CommandButton implements Bundleable {
 
     /** Builds a {@link CommandButton}. */
     public CommandButton build() {
-      checkState(
-          (sessionCommand == null) != (playerCommand == Player.COMMAND_INVALID),
-          "Exactly one of sessionCommand and playerCommand should be set");
       return new CommandButton(
           sessionCommand, playerCommand, iconResId, displayName, extras, enabled);
     }
   }
 
-  /** The session command of the button. Will be {@code null} if {@link #playerCommand} is set. */
+  /** The session command of the button. Can be {@code null} if the button is a placeholder. */
   @Nullable public final SessionCommand sessionCommand;
 
   /**
-   * The {@link Player.Command} command of the button. Will be {@link Player#COMMAND_INVALID} if
-   * {@link #sessionCommand} is set.
+   * The {@link Player.Command} command of the button. Can be {@link Player#COMMAND_INVALID} if the
+   * button is a placeholder.
    */
   public final @Player.Command int playerCommand;
 
@@ -200,74 +192,6 @@ public final class CommandButton implements Bundleable {
     this.displayName = displayName;
     this.extras = new Bundle(extras);
     this.isEnabled = enabled;
-  }
-
-  /** Returns a copy with the new {@link #isEnabled} flag. */
-  @CheckReturnValue
-  /* package */ CommandButton copyWithIsEnabled(boolean isEnabled) {
-    // Because this method is supposed to be used by the library only, this method has been chosen
-    // over the conventional `buildUpon` approach. This aims for keeping this separate from the
-    // public Builder-API used by apps.
-    if (this.isEnabled == isEnabled) {
-      return this;
-    }
-    return new CommandButton(
-        sessionCommand, playerCommand, iconResId, displayName, new Bundle(extras), isEnabled);
-  }
-
-  /** Checks the given command button for equality while ignoring {@link #extras}. */
-  @Override
-  public boolean equals(@Nullable Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (!(obj instanceof CommandButton)) {
-      return false;
-    }
-    CommandButton button = (CommandButton) obj;
-    return Objects.equal(sessionCommand, button.sessionCommand)
-        && playerCommand == button.playerCommand
-        && iconResId == button.iconResId
-        && TextUtils.equals(displayName, button.displayName)
-        && isEnabled == button.isEnabled;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(sessionCommand, playerCommand, iconResId, displayName, isEnabled);
-  }
-
-  /**
-   * Returns a list of command buttons with the {@link CommandButton#isEnabled} flag set according
-   * to the available commands passed in.
-   */
-  /* package */ static ImmutableList<CommandButton> getEnabledCommandButtons(
-      List<CommandButton> commandButtons,
-      SessionCommands sessionCommands,
-      Player.Commands playerCommands) {
-    ImmutableList.Builder<CommandButton> enabledButtons = new ImmutableList.Builder<>();
-    for (int i = 0; i < commandButtons.size(); i++) {
-      CommandButton button = commandButtons.get(i);
-      enabledButtons.add(
-          button.copyWithIsEnabled(isEnabled(button, sessionCommands, playerCommands)));
-    }
-    return enabledButtons.build();
-  }
-
-  /**
-   * Returns whether the {@link CommandButton} is enabled given the available commands passed in.
-   *
-   * @param button The command button.
-   * @param sessionCommands The available session commands.
-   * @param playerCommands The available player commands.
-   * @return Whether the button is enabled given the available commands.
-   */
-  /* package */ static boolean isEnabled(
-      CommandButton button, SessionCommands sessionCommands, Player.Commands playerCommands) {
-    return playerCommands.contains(button.playerCommand)
-        || (button.sessionCommand != null && sessionCommands.contains(button.sessionCommand))
-        || (button.playerCommand != Player.COMMAND_INVALID
-            && sessionCommands.contains(button.playerCommand));
   }
 
   // Bundleable implementation.

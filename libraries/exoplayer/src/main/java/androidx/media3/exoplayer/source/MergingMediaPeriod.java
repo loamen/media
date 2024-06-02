@@ -16,14 +16,16 @@
 package androidx.media3.exoplayer.source;
 
 import static androidx.media3.common.util.Assertions.checkNotNull;
+import static java.lang.Math.max;
 
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
+import androidx.media3.common.StreamKey;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.Assertions;
-import androidx.media3.common.util.NullableType;
-import androidx.media3.exoplayer.LoadingInfo;
+import androidx.media3.decoder.DecoderInputBuffer;
+import androidx.media3.exoplayer.FormatHolder;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.source.chunk.Chunk;
 import androidx.media3.exoplayer.source.chunk.MediaChunk;
@@ -35,6 +37,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Merges multiple {@link MediaPeriod}s. */
 /* package */ final class MergingMediaPeriod implements MediaPeriod, MediaPeriod.Callback {
@@ -76,7 +80,7 @@ import java.util.List;
    */
   public MediaPeriod getChildPeriod(int index) {
     return periods[index] instanceof TimeOffsetMediaPeriod
-        ? ((TimeOffsetMediaPeriod) periods[index]).getWrappedMediaPeriod()
+        ? ((TimeOffsetMediaPeriod) periods[index]).mediaPeriod
         : periods[index];
   }
 
@@ -189,16 +193,16 @@ import java.util.List;
   }
 
   @Override
-  public boolean continueLoading(LoadingInfo loadingInfo) {
+  public boolean continueLoading(long positionUs) {
     if (!childrenPendingPreparation.isEmpty()) {
       // Preparation is still going on.
       int childrenPendingPreparationSize = childrenPendingPreparation.size();
       for (int i = 0; i < childrenPendingPreparationSize; i++) {
-        childrenPendingPreparation.get(i).continueLoading(loadingInfo);
+        childrenPendingPreparation.get(i).continueLoading(positionUs);
       }
       return false;
     } else {
-      return compositeSequenceableLoader.continueLoading(loadingInfo);
+      return compositeSequenceableLoader.continueLoading(positionUs);
     }
   }
 
@@ -296,6 +300,176 @@ import java.util.List;
   @Override
   public void onContinueLoadingRequested(MediaPeriod ignored) {
     Assertions.checkNotNull(callback).onContinueLoadingRequested(this);
+  }
+
+  private static final class TimeOffsetMediaPeriod implements MediaPeriod, MediaPeriod.Callback {
+
+    private final MediaPeriod mediaPeriod;
+    private final long timeOffsetUs;
+
+    private @MonotonicNonNull Callback callback;
+
+    public TimeOffsetMediaPeriod(MediaPeriod mediaPeriod, long timeOffsetUs) {
+      this.mediaPeriod = mediaPeriod;
+      this.timeOffsetUs = timeOffsetUs;
+    }
+
+    @Override
+    public void prepare(Callback callback, long positionUs) {
+      this.callback = callback;
+      mediaPeriod.prepare(/* callback= */ this, positionUs - timeOffsetUs);
+    }
+
+    @Override
+    public void maybeThrowPrepareError() throws IOException {
+      mediaPeriod.maybeThrowPrepareError();
+    }
+
+    @Override
+    public TrackGroupArray getTrackGroups() {
+      return mediaPeriod.getTrackGroups();
+    }
+
+    @Override
+    public List<StreamKey> getStreamKeys(List<ExoTrackSelection> trackSelections) {
+      return mediaPeriod.getStreamKeys(trackSelections);
+    }
+
+    @Override
+    public long selectTracks(
+        @NullableType ExoTrackSelection[] selections,
+        boolean[] mayRetainStreamFlags,
+        @NullableType SampleStream[] streams,
+        boolean[] streamResetFlags,
+        long positionUs) {
+      @NullableType SampleStream[] childStreams = new SampleStream[streams.length];
+      for (int i = 0; i < streams.length; i++) {
+        TimeOffsetSampleStream sampleStream = (TimeOffsetSampleStream) streams[i];
+        childStreams[i] = sampleStream != null ? sampleStream.getChildStream() : null;
+      }
+      long startPositionUs =
+          mediaPeriod.selectTracks(
+              selections,
+              mayRetainStreamFlags,
+              childStreams,
+              streamResetFlags,
+              positionUs - timeOffsetUs);
+      for (int i = 0; i < streams.length; i++) {
+        @Nullable SampleStream childStream = childStreams[i];
+        if (childStream == null) {
+          streams[i] = null;
+        } else if (streams[i] == null
+            || ((TimeOffsetSampleStream) streams[i]).getChildStream() != childStream) {
+          streams[i] = new TimeOffsetSampleStream(childStream, timeOffsetUs);
+        }
+      }
+      return startPositionUs + timeOffsetUs;
+    }
+
+    @Override
+    public void discardBuffer(long positionUs, boolean toKeyframe) {
+      mediaPeriod.discardBuffer(positionUs - timeOffsetUs, toKeyframe);
+    }
+
+    @Override
+    public long readDiscontinuity() {
+      long discontinuityPositionUs = mediaPeriod.readDiscontinuity();
+      return discontinuityPositionUs == C.TIME_UNSET
+          ? C.TIME_UNSET
+          : discontinuityPositionUs + timeOffsetUs;
+    }
+
+    @Override
+    public long seekToUs(long positionUs) {
+      return mediaPeriod.seekToUs(positionUs - timeOffsetUs) + timeOffsetUs;
+    }
+
+    @Override
+    public long getAdjustedSeekPositionUs(long positionUs, SeekParameters seekParameters) {
+      return mediaPeriod.getAdjustedSeekPositionUs(positionUs - timeOffsetUs, seekParameters)
+          + timeOffsetUs;
+    }
+
+    @Override
+    public long getBufferedPositionUs() {
+      long bufferedPositionUs = mediaPeriod.getBufferedPositionUs();
+      return bufferedPositionUs == C.TIME_END_OF_SOURCE
+          ? C.TIME_END_OF_SOURCE
+          : bufferedPositionUs + timeOffsetUs;
+    }
+
+    @Override
+    public long getNextLoadPositionUs() {
+      long nextLoadPositionUs = mediaPeriod.getNextLoadPositionUs();
+      return nextLoadPositionUs == C.TIME_END_OF_SOURCE
+          ? C.TIME_END_OF_SOURCE
+          : nextLoadPositionUs + timeOffsetUs;
+    }
+
+    @Override
+    public boolean continueLoading(long positionUs) {
+      return mediaPeriod.continueLoading(positionUs - timeOffsetUs);
+    }
+
+    @Override
+    public boolean isLoading() {
+      return mediaPeriod.isLoading();
+    }
+
+    @Override
+    public void reevaluateBuffer(long positionUs) {
+      mediaPeriod.reevaluateBuffer(positionUs - timeOffsetUs);
+    }
+
+    @Override
+    public void onPrepared(MediaPeriod mediaPeriod) {
+      Assertions.checkNotNull(callback).onPrepared(/* mediaPeriod= */ this);
+    }
+
+    @Override
+    public void onContinueLoadingRequested(MediaPeriod source) {
+      Assertions.checkNotNull(callback).onContinueLoadingRequested(/* source= */ this);
+    }
+  }
+
+  private static final class TimeOffsetSampleStream implements SampleStream {
+
+    private final SampleStream sampleStream;
+    private final long timeOffsetUs;
+
+    public TimeOffsetSampleStream(SampleStream sampleStream, long timeOffsetUs) {
+      this.sampleStream = sampleStream;
+      this.timeOffsetUs = timeOffsetUs;
+    }
+
+    public SampleStream getChildStream() {
+      return sampleStream;
+    }
+
+    @Override
+    public boolean isReady() {
+      return sampleStream.isReady();
+    }
+
+    @Override
+    public void maybeThrowError() throws IOException {
+      sampleStream.maybeThrowError();
+    }
+
+    @Override
+    public int readData(
+        FormatHolder formatHolder, DecoderInputBuffer buffer, @ReadFlags int readFlags) {
+      int readResult = sampleStream.readData(formatHolder, buffer, readFlags);
+      if (readResult == C.RESULT_BUFFER_READ) {
+        buffer.timeUs = max(0, buffer.timeUs + timeOffsetUs);
+      }
+      return readResult;
+    }
+
+    @Override
+    public int skipData(long positionUs) {
+      return sampleStream.skipData(positionUs - timeOffsetUs);
+    }
   }
 
   private static final class ForwardingTrackSelection implements ExoTrackSelection {
@@ -429,11 +603,6 @@ import java.util.List;
     @Override
     public boolean isTrackExcluded(int index, long nowMs) {
       return trackSelection.isTrackExcluded(index, nowMs);
-    }
-
-    @Override
-    public long getLatestBitrateEstimate() {
-      return trackSelection.getLatestBitrateEstimate();
     }
 
     @Override

@@ -41,13 +41,15 @@ import org.robolectric.shadows.MediaCodecInfoBuilder;
 import org.robolectric.shadows.ShadowMediaCodec;
 import org.robolectric.shadows.ShadowMediaCodecList;
 
-/** Unit tests for {@link VideoSampleExporter.EncoderWrapper}. */
+/** Unit tests for {@link VideoSamplePipeline.EncoderWrapper}. */
 @RunWith(AndroidJUnit4.class)
 public final class VideoEncoderWrapperTest {
   private static final Composition FAKE_COMPOSITION =
       new Composition.Builder(
-              new EditedMediaItemSequence(
-                  new EditedMediaItem.Builder(MediaItem.fromUri(Uri.EMPTY)).build()))
+              ImmutableList.of(
+                  new EditedMediaItemSequence(
+                      ImmutableList.of(
+                          new EditedMediaItem.Builder(MediaItem.fromUri(Uri.EMPTY)).build()))))
           .build();
 
   private final TransformationRequest emptyTransformationRequest =
@@ -59,8 +61,8 @@ public final class VideoEncoderWrapperTest {
           new ListenerSet<>(Looper.myLooper(), Clock.DEFAULT, (listener, flags) -> {}),
           Clock.DEFAULT.createHandler(Looper.myLooper(), /* callback= */ null),
           emptyTransformationRequest);
-  private final VideoSampleExporter.EncoderWrapper encoderWrapper =
-      new VideoSampleExporter.EncoderWrapper(
+  private final VideoSamplePipeline.EncoderWrapper encoderWrapper =
+      new VideoSamplePipeline.EncoderWrapper(
           fakeEncoderFactory,
           /* inputFormat= */ new Format.Builder()
               .setSampleMimeType(MimeTypes.VIDEO_H264)

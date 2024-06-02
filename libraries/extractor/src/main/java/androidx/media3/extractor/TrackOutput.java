@@ -104,7 +104,6 @@ public interface TrackOutput {
 
   /** Main media sample data. */
   int SAMPLE_DATA_PART_MAIN = 0;
-
   /**
    * Sample encryption data.
    *
@@ -129,7 +128,6 @@ public interface TrackOutput {
    * </ul>
    */
   int SAMPLE_DATA_PART_ENCRYPTION = 1;
-
   /**
    * Sample supplemental data.
    *

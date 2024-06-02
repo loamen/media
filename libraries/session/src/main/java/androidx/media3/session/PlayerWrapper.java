@@ -21,7 +21,6 @@ import static androidx.media3.common.util.Util.msToUs;
 import static androidx.media3.common.util.Util.postOrRun;
 import static androidx.media3.session.MediaConstants.EXTRAS_KEY_MEDIA_ID_COMPAT;
 import static androidx.media3.session.MediaConstants.EXTRAS_KEY_PLAYBACK_SPEED_COMPAT;
-import static androidx.media3.session.MediaUtils.intersect;
 
 import android.media.AudioManager;
 import android.os.Bundle;
@@ -65,49 +64,15 @@ import java.util.List;
 
   private static final int STATUS_CODE_SUCCESS_COMPAT = -1;
 
-  private final boolean playIfSuppressed;
-
   private int legacyStatusCode;
   @Nullable private String legacyErrorMessage;
   @Nullable private Bundle legacyErrorExtras;
   private ImmutableList<CommandButton> customLayout;
-  private SessionCommands availableSessionCommands;
-  private Commands availablePlayerCommands;
 
-  public PlayerWrapper(
-      Player player,
-      boolean playIfSuppressed,
-      ImmutableList<CommandButton> customLayout,
-      SessionCommands availableSessionCommands,
-      Commands availablePlayerCommands) {
+  public PlayerWrapper(Player player) {
     super(player);
-    this.playIfSuppressed = playIfSuppressed;
-    this.customLayout = customLayout;
-    this.availableSessionCommands = availableSessionCommands;
-    this.availablePlayerCommands = availablePlayerCommands;
     legacyStatusCode = STATUS_CODE_SUCCESS_COMPAT;
-  }
-
-  public void setAvailableCommands(
-      SessionCommands availableSessionCommands, Commands availablePlayerCommands) {
-    this.availableSessionCommands = availableSessionCommands;
-    this.availablePlayerCommands = availablePlayerCommands;
-  }
-
-  public SessionCommands getAvailableSessionCommands() {
-    return availableSessionCommands;
-  }
-
-  public Commands getAvailablePlayerCommands() {
-    return availablePlayerCommands;
-  }
-
-  public void setCustomLayout(ImmutableList<CommandButton> customLayout) {
-    this.customLayout = customLayout;
-  }
-
-  /* package */ ImmutableList<CommandButton> getCustomLayout() {
-    return customLayout;
+    customLayout = ImmutableList.of();
   }
 
   /**
@@ -134,6 +99,11 @@ import java.util.List;
   /** Returns the legacy status code. */
   public int getLegacyStatusCode() {
     return legacyStatusCode;
+  }
+
+  /** Sets the custom layout. */
+  public void setCustomLayout(ImmutableList<CommandButton> customLayout) {
+    this.customLayout = customLayout;
   }
 
   /** Clears the legacy error status. */
@@ -998,10 +968,12 @@ import java.util.List;
           .build();
     }
     @Nullable PlaybackException playerError = getPlayerError();
-    int state = MediaUtils.convertToPlaybackStateCompatState(/* player= */ this, playIfSuppressed);
+    int state =
+        MediaUtils.convertToPlaybackStateCompatState(
+            playerError, getPlaybackState(), getPlayWhenReady());
     // Always advertise ACTION_SET_RATING.
     long actions = PlaybackStateCompat.ACTION_SET_RATING;
-    Commands availableCommands = intersect(availablePlayerCommands, getAvailableCommands());
+    Commands availableCommands = getAvailableCommands();
     for (int i = 0; i < availableCommands.size(); i++) {
       actions |= convertCommandToPlaybackStateActions(availableCommands.get(i));
     }
@@ -1033,9 +1005,7 @@ import java.util.List;
       CommandButton commandButton = customLayout.get(i);
       if (commandButton.sessionCommand != null) {
         SessionCommand sessionCommand = commandButton.sessionCommand;
-        if (sessionCommand.commandCode == SessionCommand.COMMAND_CODE_CUSTOM
-            && CommandButton.isEnabled(
-                commandButton, availableSessionCommands, availablePlayerCommands)) {
+        if (sessionCommand.commandCode == SessionCommand.COMMAND_CODE_CUSTOM) {
           builder.addCustomAction(
               new PlaybackStateCompat.CustomAction.Builder(
                       sessionCommand.customAction,
@@ -1061,11 +1031,9 @@ import java.util.List;
     }
     Commands availableCommands = getAvailableCommands();
     int volumeControlType = VolumeProviderCompat.VOLUME_CONTROL_FIXED;
-    if (availableCommands.containsAny(
-        COMMAND_ADJUST_DEVICE_VOLUME, COMMAND_ADJUST_DEVICE_VOLUME_WITH_FLAGS)) {
+    if (availableCommands.contains(COMMAND_ADJUST_DEVICE_VOLUME)) {
       volumeControlType = VolumeProviderCompat.VOLUME_CONTROL_RELATIVE;
-      if (availableCommands.containsAny(
-          COMMAND_SET_DEVICE_VOLUME, COMMAND_SET_DEVICE_VOLUME_WITH_FLAGS)) {
+      if (availableCommands.contains(COMMAND_SET_DEVICE_VOLUME)) {
         volumeControlType = VolumeProviderCompat.VOLUME_CONTROL_ABSOLUTE;
       }
     }
@@ -1201,7 +1169,6 @@ import java.util.List;
         getShuffleModeEnabled(),
         getVideoSize(),
         getCurrentTimelineWithCommandCheck(),
-        PlayerInfo.TIMELINE_CHANGE_REASON_DEFAULT,
         getPlaylistMetadataWithCommandCheck(),
         getVolumeWithCommandCheck(),
         getAudioAttributesWithCommandCheck(),

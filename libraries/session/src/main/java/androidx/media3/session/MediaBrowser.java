@@ -35,7 +35,6 @@ import androidx.media3.common.util.BitmapLoader;
 import androidx.media3.common.util.Consumer;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
-import androidx.media3.datasource.DataSourceBitmapLoader;
 import androidx.media3.session.MediaLibraryService.LibraryParams;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
@@ -127,8 +126,8 @@ public final class MediaBrowser extends MediaController {
 
     /**
      * Sets a {@link BitmapLoader} for the {@link MediaBrowser} to decode bitmaps from compressed
-     * binary data. If not set, a {@link CacheBitmapLoader} that wraps a {@link
-     * DataSourceBitmapLoader} will be used.
+     * binary data. If not set, a {@link CacheBitmapLoader} that wraps a {@link SimpleBitmapLoader}
+     * will be used.
      *
      * @param bitmapLoader The bitmap loader.
      * @return The builder to allow chaining.
@@ -169,7 +168,7 @@ public final class MediaBrowser extends MediaController {
     public ListenableFuture<MediaBrowser> buildAsync() {
       MediaControllerHolder<MediaBrowser> holder = new MediaControllerHolder<>(applicationLooper);
       if (token.isLegacySession() && bitmapLoader == null) {
-        bitmapLoader = new CacheBitmapLoader(new DataSourceBitmapLoader(context));
+        bitmapLoader = new CacheBitmapLoader(new SimpleBitmapLoader());
       }
       MediaBrowser browser =
           new MediaBrowser(
@@ -188,19 +187,16 @@ public final class MediaBrowser extends MediaController {
   public interface Listener extends MediaController.Listener {
 
     /**
-     * Called when there's a change in the parent's children after you've subscribed to the parent
+     * Called when there's change in the parent's children after you've subscribed to the parent
      * with {@link #subscribe}.
      *
-     * <p>This method is called when the app calls {@link
-     * MediaLibraryService.MediaLibrarySession#notifyChildrenChanged} for the parent, or it is
-     * called by the library immediately after calling {@link MediaBrowser#subscribe(String,
-     * LibraryParams)}.
+     * <p>This method is called when the library service called {@link
+     * MediaLibraryService.MediaLibrarySession#notifyChildrenChanged} for the parent.
      *
      * @param browser The browser for this event.
      * @param parentId The non-empty parent id that you've specified with {@link #subscribe(String,
      *     LibraryParams)}.
-     * @param itemCount The number of children, or {@link Integer#MAX_VALUE} if the number of items
-     *     is unknown.
+     * @param itemCount The number of children.
      * @param params The optional parameters from the library service. Can be differ from the {@code
      *     params} that you've specified with {@link #subscribe(String, LibraryParams)}.
      */

@@ -415,7 +415,6 @@ public class CronetDataSource extends BaseDataSource implements HttpDataSource {
 
   /** The default connection timeout, in milliseconds. */
   @UnstableApi public static final int DEFAULT_CONNECT_TIMEOUT_MILLIS = 8 * 1000;
-
   /** The default read timeout, in milliseconds. */
   @UnstableApi public static final int DEFAULT_READ_TIMEOUT_MILLIS = 8 * 1000;
 

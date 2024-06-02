@@ -18,18 +18,13 @@ package androidx.media3.session;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 
 import android.app.PendingIntent;
-import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import androidx.annotation.Nullable;
 import androidx.core.app.BundleCompat;
 import androidx.media3.common.Bundleable;
 import androidx.media3.common.Player;
-import androidx.media3.common.util.BundleUtil;
-import androidx.media3.common.util.BundleableUtil;
 import androidx.media3.common.util.Util;
-import com.google.common.collect.ImmutableList;
-import java.util.List;
 
 /**
  * Created by {@link MediaSession} to send its state to the {@link MediaController} when the
@@ -55,14 +50,11 @@ import java.util.List;
 
   public final PlayerInfo playerInfo;
 
-  public final ImmutableList<CommandButton> customLayout;
-
   public ConnectionState(
       int libraryVersion,
       int sessionInterfaceVersion,
       IMediaSession sessionBinder,
       @Nullable PendingIntent sessionActivity,
-      ImmutableList<CommandButton> customLayout,
       SessionCommands sessionCommands,
       Player.Commands playerCommandsFromSession,
       Player.Commands playerCommandsFromPlayer,
@@ -71,11 +63,10 @@ import java.util.List;
     this.libraryVersion = libraryVersion;
     this.sessionInterfaceVersion = sessionInterfaceVersion;
     this.sessionBinder = sessionBinder;
-    this.sessionActivity = sessionActivity;
-    this.customLayout = customLayout;
     this.sessionCommands = sessionCommands;
     this.playerCommandsFromSession = playerCommandsFromSession;
     this.playerCommandsFromPlayer = playerCommandsFromPlayer;
+    this.sessionActivity = sessionActivity;
     this.tokenExtras = tokenExtras;
     this.playerInfo = playerInfo;
   }
@@ -85,31 +76,20 @@ import java.util.List;
   private static final String FIELD_LIBRARY_VERSION = Util.intToStringMaxRadix(0);
   private static final String FIELD_SESSION_BINDER = Util.intToStringMaxRadix(1);
   private static final String FIELD_SESSION_ACTIVITY = Util.intToStringMaxRadix(2);
-  private static final String FIELD_CUSTOM_LAYOUT = Util.intToStringMaxRadix(9);
   private static final String FIELD_SESSION_COMMANDS = Util.intToStringMaxRadix(3);
   private static final String FIELD_PLAYER_COMMANDS_FROM_SESSION = Util.intToStringMaxRadix(4);
   private static final String FIELD_PLAYER_COMMANDS_FROM_PLAYER = Util.intToStringMaxRadix(5);
   private static final String FIELD_TOKEN_EXTRAS = Util.intToStringMaxRadix(6);
   private static final String FIELD_PLAYER_INFO = Util.intToStringMaxRadix(7);
   private static final String FIELD_SESSION_INTERFACE_VERSION = Util.intToStringMaxRadix(8);
-  private static final String FIELD_IN_PROCESS_BINDER = Util.intToStringMaxRadix(10);
-
-  // Next field key = 11
+  // Next field key = 9
 
   @Override
   public Bundle toBundle() {
-    return toBundle(Integer.MAX_VALUE);
-  }
-
-  public Bundle toBundle(int controllerInterfaceVersion) {
     Bundle bundle = new Bundle();
     bundle.putInt(FIELD_LIBRARY_VERSION, libraryVersion);
     BundleCompat.putBinder(bundle, FIELD_SESSION_BINDER, sessionBinder.asBinder());
     bundle.putParcelable(FIELD_SESSION_ACTIVITY, sessionActivity);
-    if (!customLayout.isEmpty()) {
-      bundle.putParcelableArrayList(
-          FIELD_CUSTOM_LAYOUT, BundleableUtil.toBundleArrayList(customLayout));
-    }
     bundle.putBundle(FIELD_SESSION_COMMANDS, sessionCommands.toBundle());
     bundle.putBundle(FIELD_PLAYER_COMMANDS_FROM_SESSION, playerCommandsFromSession.toBundle());
     bundle.putBundle(FIELD_PLAYER_COMMANDS_FROM_PLAYER, playerCommandsFromPlayer.toBundle());
@@ -118,21 +98,9 @@ import java.util.List;
         MediaUtils.intersect(playerCommandsFromSession, playerCommandsFromPlayer);
     bundle.putBundle(
         FIELD_PLAYER_INFO,
-        playerInfo
-            .filterByAvailableCommands(
-                intersectedCommands, /* excludeTimeline= */ false, /* excludeTracks= */ false)
-            .toBundle(controllerInterfaceVersion));
+        playerInfo.toBundle(
+            intersectedCommands, /* excludeTimeline= */ false, /* excludeTracks= */ false));
     bundle.putInt(FIELD_SESSION_INTERFACE_VERSION, sessionInterfaceVersion);
-    return bundle;
-  }
-
-  /**
-   * Returns a {@link Bundle} that stores a direct object reference to this class for in-process
-   * sharing.
-   */
-  public Bundle toBundleInProcess() {
-    Bundle bundle = new Bundle();
-    BundleUtil.putBinder(bundle, FIELD_IN_PROCESS_BINDER, new InProcessBinder());
     return bundle;
   }
 
@@ -140,21 +108,11 @@ import java.util.List;
   public static final Creator<ConnectionState> CREATOR = ConnectionState::fromBundle;
 
   private static ConnectionState fromBundle(Bundle bundle) {
-    @Nullable IBinder inProcessBinder = BundleUtil.getBinder(bundle, FIELD_IN_PROCESS_BINDER);
-    if (inProcessBinder instanceof InProcessBinder) {
-      return ((InProcessBinder) inProcessBinder).getConnectionState();
-    }
     int libraryVersion = bundle.getInt(FIELD_LIBRARY_VERSION, /* defaultValue= */ 0);
     int sessionInterfaceVersion =
         bundle.getInt(FIELD_SESSION_INTERFACE_VERSION, /* defaultValue= */ 0);
     IBinder sessionBinder = checkNotNull(BundleCompat.getBinder(bundle, FIELD_SESSION_BINDER));
     @Nullable PendingIntent sessionActivity = bundle.getParcelable(FIELD_SESSION_ACTIVITY);
-    @Nullable
-    List<Bundle> commandButtonArrayList = bundle.getParcelableArrayList(FIELD_CUSTOM_LAYOUT);
-    ImmutableList<CommandButton> customLayout =
-        commandButtonArrayList != null
-            ? BundleableUtil.fromBundleList(CommandButton.CREATOR, commandButtonArrayList)
-            : ImmutableList.of();
     @Nullable Bundle sessionCommandsBundle = bundle.getBundle(FIELD_SESSION_COMMANDS);
     SessionCommands sessionCommands =
         sessionCommandsBundle == null
@@ -183,17 +141,10 @@ import java.util.List;
         sessionInterfaceVersion,
         IMediaSession.Stub.asInterface(sessionBinder),
         sessionActivity,
-        customLayout,
         sessionCommands,
         playerCommandsFromSession,
         playerCommandsFromPlayer,
         tokenExtras == null ? Bundle.EMPTY : tokenExtras,
         playerInfo);
-  }
-
-  private final class InProcessBinder extends Binder {
-    public ConnectionState getConnectionState() {
-      return ConnectionState.this;
-    }
   }
 }

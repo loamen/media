@@ -16,7 +16,6 @@
 package androidx.media3.session;
 
 import static androidx.media3.test.session.common.CommonConstants.ACTION_MEDIA3_CONTROLLER;
-import static androidx.media3.test.session.common.CommonConstants.KEY_COMMAND_BUTTON_LIST;
 import static androidx.media3.test.session.common.CommonConstants.MEDIA3_CONTROLLER_PROVIDER_SERVICE;
 import static androidx.media3.test.session.common.TestUtils.SERVICE_CONNECTION_TIMEOUT_MS;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -30,12 +29,10 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import androidx.annotation.Nullable;
-import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackParameters;
-import androidx.media3.common.Player;
 import androidx.media3.common.Player.RepeatMode;
 import androidx.media3.common.Rating;
 import androidx.media3.common.TrackSelectionParameters;
@@ -43,8 +40,6 @@ import androidx.media3.common.util.BundleableUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.test.session.common.IRemoteMediaController;
 import androidx.media3.test.session.common.TestUtils;
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -315,11 +310,6 @@ public class RemoteMediaController {
     binder.setDeviceMutedWithFlags(controllerId, muted, flags);
   }
 
-  public void setAudioAttributes(AudioAttributes audioAttributes, boolean handleAudioFocus)
-      throws RemoteException {
-    binder.setAudioAttributes(controllerId, audioAttributes.toBundle(), handleAudioFocus);
-  }
-
   public SessionResult sendCustomCommand(SessionCommand command, Bundle args)
       throws RemoteException {
     Bundle result = binder.sendCustomCommand(controllerId, command.toBundle(), args);
@@ -357,21 +347,6 @@ public class RemoteMediaController {
         BundleableUtil.toBundleList(initialMediaItems),
         BundleableUtil.toBundleList(addedMediaItems),
         seekIndex);
-  }
-
-  public ImmutableList<CommandButton> getCustomLayout() throws RemoteException {
-    Bundle customLayoutBundle = binder.getCustomLayout(controllerId);
-    ArrayList<Bundle> list = customLayoutBundle.getParcelableArrayList(KEY_COMMAND_BUTTON_LIST);
-    ImmutableList.Builder<CommandButton> customLayout = new ImmutableList.Builder<>();
-    for (Bundle bundle : list) {
-      customLayout.add(CommandButton.CREATOR.fromBundle(bundle));
-    }
-    return customLayout.build();
-  }
-
-  public Player.Commands getAvailableCommands() throws RemoteException {
-    Bundle commandsBundle = binder.getAvailableCommands(controllerId);
-    return Player.Commands.CREATOR.fromBundle(commandsBundle);
   }
 
   ////////////////////////////////////////////////////////////////////////////////

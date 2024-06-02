@@ -93,10 +93,10 @@ public final class RemoteControllerTestRule extends ExternalResource {
    * Creates {@link RemoteMediaBrowser} from {@link SessionToken} with default options waiting for
    * connection.
    */
-  public RemoteMediaBrowser createRemoteBrowser(SessionToken token, Bundle connectionHints)
-      throws RemoteException {
+  public RemoteMediaBrowser createRemoteBrowser(SessionToken token) throws RemoteException {
     RemoteMediaBrowser browser =
-        new RemoteMediaBrowser(context, token, /* waitForConnection= */ true, connectionHints);
+        new RemoteMediaBrowser(
+            context, token, /* waitForConnection= */ true, /* connectionHints= */ null);
     controllers.add(browser);
     return browser;
   }

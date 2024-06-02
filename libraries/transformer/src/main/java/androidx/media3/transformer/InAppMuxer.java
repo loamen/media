@@ -25,10 +25,9 @@ import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
+import androidx.media3.container.CreationTime;
 import androidx.media3.container.MdtaMetadataEntry;
 import androidx.media3.container.Mp4LocationData;
-import androidx.media3.container.Mp4TimestampData;
-import androidx.media3.container.Mp4Util;
 import androidx.media3.container.XmpData;
 import androidx.media3.muxer.Mp4Muxer;
 import androidx.media3.muxer.Mp4Muxer.TrackToken;
@@ -165,19 +164,7 @@ public final class InAppMuxer implements Muxer {
         data.position(), size, presentationTimeUs, TransformerUtil.getMediaCodecFlags(flags));
 
     try {
-      // Copy sample data and release the original buffer.
-      ByteBuffer byteBufferCopy = ByteBuffer.allocateDirect(data.remaining());
-      byteBufferCopy.put(data);
-      byteBufferCopy.rewind();
-
-      BufferInfo bufferInfoCopy = new BufferInfo();
-      bufferInfoCopy.set(
-          /* newOffset= */ byteBufferCopy.position(),
-          /* newSize= */ byteBufferCopy.remaining(),
-          bufferInfo.presentationTimeUs,
-          bufferInfo.flags);
-
-      mp4Muxer.writeSampleData(trackTokenList.get(trackIndex), byteBufferCopy, bufferInfoCopy);
+      mp4Muxer.writeSampleData(trackTokenList.get(trackIndex), data, bufferInfo);
     } catch (IOException e) {
       throw new MuxerException(
           "Failed to write sample for trackIndex="
@@ -198,7 +185,7 @@ public final class InAppMuxer implements Muxer {
       // LINT.IfChange(added_metadata)
       if (entry instanceof Mp4LocationData
           || entry instanceof XmpData
-          || entry instanceof Mp4TimestampData
+          || entry instanceof CreationTime
           || (entry instanceof MdtaMetadataEntry
               && (((MdtaMetadataEntry) entry).key.equals(MdtaMetadataEntry.KEY_ANDROID_CAPTURE_FPS)
                   || ((MdtaMetadataEntry) entry).typeIndicator
@@ -241,10 +228,9 @@ public final class InAppMuxer implements Muxer {
             ((Mp4LocationData) entry).latitude, ((Mp4LocationData) entry).longitude);
       } else if (entry instanceof XmpData) {
         mp4Muxer.addXmp(ByteBuffer.wrap(((XmpData) entry).data));
-      } else if (entry instanceof Mp4TimestampData) {
+      } else if (entry instanceof CreationTime) {
         // TODO: b/285281716 - Use creation time specific API.
-        mp4Muxer.setModificationTime(
-            Mp4Util.mp4TimeToUnixTimeMs(((Mp4TimestampData) entry).creationTimestampSeconds));
+        mp4Muxer.setModificationTime(((CreationTime) entry).timestampMs);
       } else if (entry instanceof MdtaMetadataEntry) {
         MdtaMetadataEntry mdtaMetadataEntry = (MdtaMetadataEntry) entry;
         if (mdtaMetadataEntry.key.equals(MdtaMetadataEntry.KEY_ANDROID_CAPTURE_FPS)) {

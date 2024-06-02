@@ -29,9 +29,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.ColorInfo;
 import androidx.media3.common.MediaItem;
 import androidx.media3.transformer.AndroidTestUtil;
-import androidx.media3.transformer.Composition;
 import androidx.media3.transformer.EditedMediaItem;
-import androidx.media3.transformer.EditedMediaItemSequence;
 import androidx.media3.transformer.ExportException;
 import androidx.media3.transformer.ExportTestResult;
 import androidx.media3.transformer.TransformationRequest;
@@ -45,7 +43,8 @@ import org.junit.runner.RunWith;
 
 /**
  * {@link Transformer} instrumentation test for applying an {@linkplain
- * Composition#HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC HDR to SDR tone mapping edit}.
+ * TransformationRequest#HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC HDR to SDR tone mapping
+ * edit}.
  */
 @RunWith(AndroidJUnit4.class)
 public class ToneMapHdrToSdrUsingMediaCodecTest {
@@ -68,6 +67,10 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
 
     Transformer transformer =
         new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder()
+                    .setHdrMode(TransformationRequest.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
+                    .build())
             .addListener(
                 new Transformer.Listener() {
                   @Override
@@ -82,19 +85,13 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
                   }
                 })
             .build();
-    EditedMediaItem editedMediaItem =
-        new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(MP4_ASSET_720P_4_SECOND_HDR10)))
-            .build();
-    Composition composition =
-        new Composition.Builder(new EditedMediaItemSequence(editedMediaItem))
-            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
-            .build();
+    MediaItem mediaItem = MediaItem.fromUri(Uri.parse(MP4_ASSET_720P_4_SECOND_HDR10));
 
     try {
       ExportTestResult exportTestResult =
           new TransformerAndroidTestRunner.Builder(context, transformer)
               .build()
-              .run(testId, composition);
+              .run(testId, mediaItem);
       assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
     } catch (ExportException exception) {
       if (exception.getCause() != null
@@ -129,6 +126,10 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
 
     Transformer transformer =
         new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder()
+                    .setHdrMode(TransformationRequest.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
+                    .build())
             .addListener(
                 new Transformer.Listener() {
                   @Override
@@ -143,19 +144,13 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
                   }
                 })
             .build();
-    EditedMediaItem editedMediaItem =
-        new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(MP4_ASSET_1080P_5_SECOND_HLG10)))
-            .build();
-    Composition composition =
-        new Composition.Builder(new EditedMediaItemSequence(editedMediaItem))
-            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
-            .build();
+    MediaItem mediaItem = MediaItem.fromUri(Uri.parse(MP4_ASSET_1080P_5_SECOND_HLG10));
 
     try {
       ExportTestResult exportTestResult =
           new TransformerAndroidTestRunner.Builder(context, transformer)
               .build()
-              .run(testId, composition);
+              .run(testId, mediaItem);
       assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
     } catch (ExportException exception) {
       if (exception.getCause() != null
@@ -190,6 +185,10 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
 
     Transformer transformer =
         new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder()
+                    .setHdrMode(TransformationRequest.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
+                    .build())
             .addListener(
                 new Transformer.Listener() {
                   @Override
@@ -204,20 +203,15 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
                   }
                 })
             .build();
+    MediaItem mediaItem = MediaItem.fromUri(Uri.parse(MP4_ASSET_720P_4_SECOND_HDR10));
     EditedMediaItem editedMediaItem =
-        new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(MP4_ASSET_720P_4_SECOND_HDR10)))
-            .setEffects(FORCE_TRANSCODE_VIDEO_EFFECTS)
-            .build();
-    Composition composition =
-        new Composition.Builder(new EditedMediaItemSequence(editedMediaItem))
-            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
-            .build();
+        new EditedMediaItem.Builder(mediaItem).setEffects(FORCE_TRANSCODE_VIDEO_EFFECTS).build();
 
     try {
       ExportTestResult exportTestResult =
           new TransformerAndroidTestRunner.Builder(context, transformer)
               .build()
-              .run(testId, composition);
+              .run(testId, editedMediaItem);
       assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
     } catch (ExportException exception) {
       if (exception.getCause() != null
@@ -252,6 +246,10 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
 
     Transformer transformer =
         new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder()
+                    .setHdrMode(TransformationRequest.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
+                    .build())
             .addListener(
                 new Transformer.Listener() {
                   @Override
@@ -266,20 +264,15 @@ public class ToneMapHdrToSdrUsingMediaCodecTest {
                   }
                 })
             .build();
+    MediaItem mediaItem = MediaItem.fromUri(Uri.parse(MP4_ASSET_1080P_5_SECOND_HLG10));
     EditedMediaItem editedMediaItem =
-        new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(MP4_ASSET_1080P_5_SECOND_HLG10)))
-            .setEffects(FORCE_TRANSCODE_VIDEO_EFFECTS)
-            .build();
-    Composition composition =
-        new Composition.Builder(new EditedMediaItemSequence(editedMediaItem))
-            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC)
-            .build();
+        new EditedMediaItem.Builder(mediaItem).setEffects(FORCE_TRANSCODE_VIDEO_EFFECTS).build();
 
     try {
       ExportTestResult exportTestResult =
           new TransformerAndroidTestRunner.Builder(context, transformer)
               .build()
-              .run(testId, composition);
+              .run(testId, editedMediaItem);
       assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
     } catch (ExportException exception) {
       if (exception.getCause() != null

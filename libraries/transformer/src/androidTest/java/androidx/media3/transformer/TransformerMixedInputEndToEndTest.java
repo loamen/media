@@ -18,8 +18,6 @@
 package androidx.media3.transformer;
 
 import static androidx.media3.transformer.AndroidTestUtil.JPG_ASSET_URI_STRING;
-import static androidx.media3.transformer.AndroidTestUtil.MP4_ASSET_FORMAT;
-import static androidx.media3.transformer.AndroidTestUtil.MP4_ASSET_FRAME_COUNT;
 import static androidx.media3.transformer.AndroidTestUtil.MP4_ASSET_URI_STRING;
 import static androidx.media3.transformer.AndroidTestUtil.PNG_ASSET_URI_STRING;
 import static com.google.common.truth.Truth.assertThat;
@@ -46,19 +44,16 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class TransformerMixedInputEndToEndTest {
 
+  // Result of the following command for MP4_ASSET_URI_STRING
+  // ffprobe -count_frames -select_streams v:0 -show_entries stream=nb_read_frames sample.mp4
+  private static final int VIDEO_FRAME_COUNT_FOR_MP4_ASSET = 30;
+
   private final Context context = ApplicationProvider.getApplicationContext();
 
   @Test
   public void videoEditing_withImageThenVideoInputs_completesWithCorrectFrameCount()
       throws Exception {
     String testId = "videoEditing_withImageThenVideoInputs_completesWithCorrectFrameCount";
-    if (AndroidTestUtil.skipAndLogIfFormatsUnsupported(
-        context,
-        testId,
-        /* inputFormat= */ MP4_ASSET_FORMAT,
-        /* outputFormat= */ MP4_ASSET_FORMAT)) {
-      return;
-    }
     Transformer transformer =
         new Transformer.Builder(context)
             .setEncoderFactory(
@@ -74,23 +69,18 @@ public class TransformerMixedInputEndToEndTest {
     ExportTestResult result =
         new TransformerAndroidTestRunner.Builder(context, transformer)
             .build()
-            .run(testId, buildComposition(imageEditedMediaItem, videoEditedMediaItem));
+            .run(
+                testId,
+                buildComposition(ImmutableList.of(imageEditedMediaItem, videoEditedMediaItem)));
 
     assertThat(result.exportResult.videoFrameCount)
-        .isEqualTo(imageFrameCount + MP4_ASSET_FRAME_COUNT);
+        .isEqualTo(imageFrameCount + VIDEO_FRAME_COUNT_FOR_MP4_ASSET);
   }
 
   @Test
   public void videoEditing_withVideoThenImageInputs_completesWithCorrectFrameCount()
       throws Exception {
     String testId = "videoEditing_withVideoThenImageInputs_completesWithCorrectFrameCount";
-    if (AndroidTestUtil.skipAndLogIfFormatsUnsupported(
-        context,
-        testId,
-        /* inputFormat= */ MP4_ASSET_FORMAT,
-        /* outputFormat= */ MP4_ASSET_FORMAT)) {
-      return;
-    }
     Transformer transformer =
         new Transformer.Builder(context)
             .setEncoderFactory(
@@ -105,10 +95,12 @@ public class TransformerMixedInputEndToEndTest {
     ExportTestResult result =
         new TransformerAndroidTestRunner.Builder(context, transformer)
             .build()
-            .run(testId, buildComposition(videoEditedMediaItem, imageEditedMediaItem));
+            .run(
+                testId,
+                buildComposition(ImmutableList.of(videoEditedMediaItem, imageEditedMediaItem)));
 
     assertThat(result.exportResult.videoFrameCount)
-        .isEqualTo(imageFrameCount + MP4_ASSET_FRAME_COUNT);
+        .isEqualTo(imageFrameCount + VIDEO_FRAME_COUNT_FOR_MP4_ASSET);
   }
 
   @Test
@@ -117,13 +109,6 @@ public class TransformerMixedInputEndToEndTest {
           throws Exception {
     String testId =
         "videoEditing_withComplexVideoAndImageInputsEndWithVideo_completesWithCorrectFrameCount";
-    if (AndroidTestUtil.skipAndLogIfFormatsUnsupported(
-        context,
-        testId,
-        /* inputFormat= */ MP4_ASSET_FORMAT,
-        /* outputFormat= */ MP4_ASSET_FORMAT)) {
-      return;
-    }
     Transformer transformer =
         new Transformer.Builder(context)
             .setEncoderFactory(
@@ -143,16 +128,17 @@ public class TransformerMixedInputEndToEndTest {
             .run(
                 testId,
                 buildComposition(
-                    videoEditedMediaItem,
-                    videoEditedMediaItem,
-                    imageEditedMediaItem1,
-                    imageEditedMediaItem2,
-                    videoEditedMediaItem,
-                    imageEditedMediaItem1,
-                    videoEditedMediaItem));
+                    ImmutableList.of(
+                        videoEditedMediaItem,
+                        videoEditedMediaItem,
+                        imageEditedMediaItem1,
+                        imageEditedMediaItem2,
+                        videoEditedMediaItem,
+                        imageEditedMediaItem1,
+                        videoEditedMediaItem)));
 
     assertThat(result.exportResult.videoFrameCount)
-        .isEqualTo(3 * imageFrameCount + 4 * MP4_ASSET_FRAME_COUNT);
+        .isEqualTo(3 * imageFrameCount + 4 * VIDEO_FRAME_COUNT_FOR_MP4_ASSET);
   }
 
   @Test
@@ -161,13 +147,6 @@ public class TransformerMixedInputEndToEndTest {
           throws Exception {
     String testId =
         "videoEditing_withComplexVideoAndImageInputsEndWithImage_completesWithCorrectFrameCount";
-    if (AndroidTestUtil.skipAndLogIfFormatsUnsupported(
-        context,
-        testId,
-        /* inputFormat= */ MP4_ASSET_FORMAT,
-        /* outputFormat= */ MP4_ASSET_FORMAT)) {
-      return;
-    }
     Transformer transformer =
         new Transformer.Builder(context)
             .setEncoderFactory(
@@ -187,16 +166,17 @@ public class TransformerMixedInputEndToEndTest {
             .run(
                 testId,
                 buildComposition(
-                    imageEditedMediaItem,
-                    videoEditedMediaItem,
-                    videoEditedMediaItem,
-                    imageEditedMediaItem,
-                    imageEditedMediaItem,
-                    videoEditedMediaItem,
-                    imageEditedMediaItem));
+                    ImmutableList.of(
+                        imageEditedMediaItem,
+                        videoEditedMediaItem,
+                        videoEditedMediaItem,
+                        imageEditedMediaItem,
+                        imageEditedMediaItem,
+                        videoEditedMediaItem,
+                        imageEditedMediaItem)));
 
     assertThat(result.exportResult.videoFrameCount)
-        .isEqualTo(4 * imageFrameCount + 3 * MP4_ASSET_FRAME_COUNT);
+        .isEqualTo(4 * imageFrameCount + 3 * VIDEO_FRAME_COUNT_FOR_MP4_ASSET);
   }
 
   /** Creates an {@link EditedMediaItem} with image, with duration of one second. */
@@ -206,7 +186,6 @@ public class TransformerMixedInputEndToEndTest {
         .setFrameRate(frameCount)
         .build();
   }
-
   /**
    * Creates an {@link EditedMediaItem} with video, with audio removed and a {@link Presentation} of
    * specified {@code height}.
@@ -221,11 +200,11 @@ public class TransformerMixedInputEndToEndTest {
         .build();
   }
 
-  private static Composition buildComposition(EditedMediaItem... editedMediaItems) {
-    return new Composition.Builder(new EditedMediaItemSequence(editedMediaItems))
+  private static Composition buildComposition(ImmutableList<EditedMediaItem> editedMediaItems) {
+    return new Composition.Builder(ImmutableList.of(new EditedMediaItemSequence(editedMediaItems)))
         .setEffects(
             new Effects(
-                /* audioProcessors= */ ImmutableList.of(),
+                ImmutableList.of(),
                 ImmutableList.of(
                     // To ensure that software encoders can encode.
                     Presentation.createForWidthAndHeight(

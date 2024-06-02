@@ -381,7 +381,6 @@ public final class ActionSchedule {
               /* positionMs= */ C.TIME_UNSET,
               mediaSources));
     }
-
     /**
      * Schedules a add media items action to be executed.
      *

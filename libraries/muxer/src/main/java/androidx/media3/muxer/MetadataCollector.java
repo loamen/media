@@ -15,10 +15,8 @@
  */
 package androidx.media3.muxer;
 
-import static androidx.media3.common.util.Assertions.checkArgument;
 import static androidx.media3.common.util.Assertions.checkState;
 
-import androidx.media3.container.Mp4Util;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,14 +27,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   public int orientation;
   public @MonotonicNonNull Mp4Location location;
   public Map<String, Object> metadataPairs;
-  public int modificationTimestampSeconds;
+  public long modificationDateUnixMs;
   public @MonotonicNonNull ByteBuffer xmpData;
 
   public MetadataCollector() {
     orientation = 0;
     metadataPairs = new LinkedHashMap<>();
-    modificationTimestampSeconds =
-        (int) Mp4Util.unixTimeToMp4TimeSeconds(System.currentTimeMillis());
+    modificationDateUnixMs = System.currentTimeMillis();
   }
 
   public void addXmp(ByteBuffer xmpData) {
@@ -60,10 +57,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     metadataPairs.put(key, value);
   }
 
-  public void setModificationTime(long unixTimestampMs) {
-    long maxUnsignedInt = 4294967295L;
-    long timestampSeconds = Mp4Util.unixTimeToMp4TimeSeconds(unixTimestampMs);
-    checkArgument(timestampSeconds <= maxUnsignedInt, "Only 32-bit long timestamp supported");
-    this.modificationTimestampSeconds = (int) timestampSeconds;
+  public void setModificationTime(long modificationDateUnixMs) {
+    this.modificationDateUnixMs = modificationDateUnixMs;
   }
 }

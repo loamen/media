@@ -374,7 +374,6 @@ public final class Tracks implements Bundleable {
   public int hashCode() {
     return groups.hashCode();
   }
-
   // Bundleable implementation.
 
   private static final String FIELD_TRACK_GROUPS = Util.intToStringMaxRadix(0);

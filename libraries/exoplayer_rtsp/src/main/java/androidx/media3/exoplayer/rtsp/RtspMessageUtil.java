@@ -54,7 +54,6 @@ import java.util.regex.Pattern;
   public static final class RtspSessionHeader {
     /** The session ID. */
     public final String sessionId;
-
     /**
      * The session timeout, measured in milliseconds, {@link #DEFAULT_RTSP_TIMEOUT_MS} if not
      * specified in the Session header.
@@ -72,7 +71,6 @@ import java.util.regex.Pattern;
   public static final class RtspAuthUserInfo {
     /** The username. */
     public final String username;
-
     /** The password. */
     public final String password;
 
@@ -285,8 +283,7 @@ import java.util.regex.Pattern;
       case "TEARDOWN":
         return METHOD_TEARDOWN;
       default:
-        // Return METHOD_UNSET for unknown Rtsp Request method.
-        return METHOD_UNSET;
+        throw new IllegalArgumentException();
     }
   }
 
@@ -389,10 +386,7 @@ import java.util.regex.Pattern;
 
     ImmutableList.Builder<Integer> methodListBuilder = new ImmutableList.Builder<>();
     for (String method : Util.split(publicHeader, ",\\s?")) {
-      @RtspRequest.Method int rtspRequestMethod = parseMethodString(method);
-      if (rtspRequestMethod != METHOD_UNSET) {
-        methodListBuilder.add(rtspRequestMethod);
-      }
+      methodListBuilder.add(parseMethodString(method));
     }
     return methodListBuilder.build();
   }

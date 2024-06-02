@@ -21,7 +21,6 @@ import androidx.media3.common.Format;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
 import androidx.media3.exoplayer.source.chunk.Chunk;
@@ -29,6 +28,7 @@ import androidx.media3.exoplayer.source.chunk.MediaChunk;
 import androidx.media3.exoplayer.source.chunk.MediaChunkIterator;
 import androidx.media3.exoplayer.upstream.BandwidthMeter;
 import java.util.List;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * A {@link TrackSelection} that can change the individually selected track as a result of calling
@@ -43,10 +43,8 @@ public interface ExoTrackSelection extends TrackSelection {
   final class Definition {
     /** The {@link TrackGroup} which tracks belong to. */
     public final TrackGroup group;
-
     /** The indices of the selected tracks in {@link #group}. */
     public final int[] tracks;
-
     /** The type that will be returned from {@link TrackSelection#getType()}. */
     public final @Type int type;
 
@@ -292,14 +290,4 @@ public interface ExoTrackSelection extends TrackSelection {
    *     android.os.SystemClock#elapsedRealtime()}.
    */
   boolean isTrackExcluded(int index, long nowMs);
-
-  /**
-   * Returns the most recent bitrate estimate utilised for track selection.
-   *
-   * <p>The default behavior is to return {@link C#RATE_UNSET_INT}, indicating that the bitrate
-   * estimate was not computed for the track selection decision.
-   */
-  default long getLatestBitrateEstimate() {
-    return C.RATE_UNSET_INT;
-  }
 }

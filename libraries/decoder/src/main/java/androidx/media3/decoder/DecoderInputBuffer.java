@@ -47,7 +47,6 @@ public class DecoderInputBuffer extends Buffer {
 
     /** The current capacity of the buffer. */
     public final int currentCapacity;
-
     /** The required capacity of the buffer. */
     public final int requiredCapacity;
 
@@ -79,13 +78,10 @@ public class DecoderInputBuffer extends Buffer {
     BUFFER_REPLACEMENT_MODE_DIRECT
   })
   public @interface BufferReplacementMode {}
-
   /** Disallows buffer replacement. */
   public static final int BUFFER_REPLACEMENT_MODE_DISABLED = 0;
-
   /** Allows buffer replacement using {@link ByteBuffer#allocate(int)}. */
   public static final int BUFFER_REPLACEMENT_MODE_NORMAL = 1;
-
   /** Allows buffer replacement using {@link ByteBuffer#allocateDirect(int)}. */
   public static final int BUFFER_REPLACEMENT_MODE_DIRECT = 2;
 

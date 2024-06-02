@@ -58,8 +58,6 @@ import androidx.media3.common.util.Log;
 import androidx.media3.common.util.Size;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
-import androidx.media3.datasource.DataSourceBitmapLoader;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
@@ -270,8 +268,8 @@ public class MediaController implements Player {
 
     /**
      * Sets a {@link BitmapLoader} for the {@link MediaController} to decode bitmaps from compressed
-     * binary data. If not set, a {@link CacheBitmapLoader} that wraps a {@link
-     * DataSourceBitmapLoader} will be used.
+     * binary data. If not set, a {@link CacheBitmapLoader} that wraps a {@link SimpleBitmapLoader}
+     * will be used.
      *
      * @param bitmapLoader The bitmap loader.
      * @return The builder to allow chaining.
@@ -313,7 +311,7 @@ public class MediaController implements Player {
       MediaControllerHolder<MediaController> holder =
           new MediaControllerHolder<>(applicationLooper);
       if (token.isLegacySession() && bitmapLoader == null) {
-        bitmapLoader = new CacheBitmapLoader(new DataSourceBitmapLoader(context));
+        bitmapLoader = new CacheBitmapLoader(new SimpleBitmapLoader());
       }
       MediaController controller =
           new MediaController(
@@ -345,37 +343,21 @@ public class MediaController implements Player {
     /**
      * Called when the session sets the custom layout through {@link MediaSession#setCustomLayout}.
      *
-     * <p>This method will be deprecated. Use {@link #onCustomLayoutChanged(MediaController, List)}
-     * instead.
+     * <p>Return a {@link ListenableFuture} to reply with a {@link SessionResult} to the session
+     * asynchronously. You can also return a {@link SessionResult} directly by using Guava's {@link
+     * Futures#immediateFuture(Object)}.
      *
-     * <p>There is a slight difference in behaviour. This to be deprecated method may be
-     * consecutively called with an unchanged custom layout passed into it, in which case the new
-     * {@link #onCustomLayoutChanged(MediaController, List)} isn't called again for equal arguments.
+     * <p>The default implementation returns a {@link ListenableFuture} of {@link
+     * SessionResult#RESULT_ERROR_NOT_SUPPORTED}.
      *
-     * <p>Further, when the available commands of a controller change in a way that affect whether
-     * buttons of the custom layout are enabled or disabled, the new callback {@link
-     * #onCustomLayoutChanged(MediaController, List)} is called, in which case the deprecated
-     * callback isn't called.
+     * @param controller The controller.
+     * @param layout The ordered list of {@link CommandButton}.
+     * @return The result of handling the custom layout.
      */
     default ListenableFuture<SessionResult> onSetCustomLayout(
         MediaController controller, List<CommandButton> layout) {
       return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED));
     }
-
-    /**
-     * Called when the {@linkplain #getCustomLayout() custom layout} changed.
-     *
-     * <p>The custom layout can change when either the session {@linkplain
-     * MediaSession#setCustomLayout changes the custom layout}, or when the session {@linkplain
-     * MediaSession#setAvailableCommands(MediaSession.ControllerInfo, SessionCommands, Commands)
-     * changes the available commands} for a controller that affect whether buttons of the custom
-     * layout are enabled or disabled.
-     *
-     * @param controller The controller.
-     * @param layout The ordered list of {@linkplain CommandButton command buttons}.
-     */
-    @UnstableApi
-    default void onCustomLayoutChanged(MediaController controller, List<CommandButton> layout) {}
 
     /**
      * Called when the available session commands are changed by session.
@@ -539,7 +521,7 @@ public class MediaController implements Player {
    * controller.
    */
   public static void releaseFuture(Future<? extends MediaController> controllerFuture) {
-    if (controllerFuture.cancel(/* mayInterruptIfRunning= */ false)) {
+    if (controllerFuture.cancel(/* mayInterruptIfRunning= */ true)) {
       // Successfully canceled the Future. The controller will be released by MediaControllerHolder.
       return;
     }
@@ -951,20 +933,6 @@ public class MediaController implements Player {
       return impl.sendCustomCommand(command, args);
     }
     return createDisconnectedFuture();
-  }
-
-  /**
-   * Returns the custom layout.
-   *
-   * <p>After being connected, a change of the custom layout is reported with {@link
-   * Listener#onCustomLayoutChanged(MediaController, List)}.
-   *
-   * @return The custom layout.
-   */
-  @UnstableApi
-  public final ImmutableList<CommandButton> getCustomLayout() {
-    verifyApplicationThread();
-    return isConnected() ? impl.getCustomLayout() : ImmutableList.of();
   }
 
   /** Returns {@code null}. */
@@ -1721,7 +1689,6 @@ public class MediaController implements Player {
     }
     impl.setDeviceVolume(volume, flags);
   }
-
   /**
    * @deprecated Use {@link #increaseDeviceVolume(int)} instead.
    */
@@ -1745,7 +1712,6 @@ public class MediaController implements Player {
     }
     impl.increaseDeviceVolume(flags);
   }
-
   /**
    * @deprecated Use {@link #decreaseDeviceVolume(int)} instead.
    */
@@ -1769,7 +1735,6 @@ public class MediaController implements Player {
     }
     impl.decreaseDeviceVolume(flags);
   }
-
   /**
    * @deprecated Use {@link #setDeviceMuted(boolean, int)} instead.
    */
@@ -1792,16 +1757,6 @@ public class MediaController implements Player {
       return;
     }
     impl.setDeviceMuted(muted, flags);
-  }
-
-  @Override
-  public final void setAudioAttributes(AudioAttributes audioAttributes, boolean handleAudioFocus) {
-    verifyApplicationThread();
-    if (!isConnected()) {
-      Log.w(TAG, "The controller is not connected. Ignoring setAudioAttributes().");
-      return;
-    }
-    impl.setAudioAttributes(audioAttributes, handleAudioFocus);
   }
 
   @Override
@@ -2027,8 +1982,6 @@ public class MediaController implements Player {
 
     ListenableFuture<SessionResult> sendCustomCommand(SessionCommand command, Bundle args);
 
-    ImmutableList<CommandButton> getCustomLayout();
-
     Timeline getCurrentTimeline();
 
     void setMediaItem(MediaItem mediaItem);
@@ -2149,8 +2102,6 @@ public class MediaController implements Player {
     void setDeviceMuted(boolean muted);
 
     void setDeviceMuted(boolean muted, @C.VolumeFlags int flags);
-
-    void setAudioAttributes(AudioAttributes audioAttributes, boolean handleAudioFocus);
 
     boolean getPlayWhenReady();
 

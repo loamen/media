@@ -30,7 +30,6 @@ import android.os.Looper;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
@@ -104,36 +103,6 @@ public class AsynchronousMediaCodecCallbackTest {
     assertThat(flushCompleted.get()).isFalse();
     assertThat(asynchronousMediaCodecCallback.dequeueInputBufferIndex())
         .isEqualTo(MediaCodec.INFO_TRY_AGAIN_LATER);
-  }
-
-  @Test
-  public void dequeInputBufferIndex_withPendingFlushAndError_throwsError() throws Exception {
-    AtomicBoolean beforeFlushCompletes = new AtomicBoolean();
-    AtomicBoolean flushCompleted = new AtomicBoolean();
-    Looper callbackThreadLooper = callbackThread.getLooper();
-    Handler callbackHandler = new Handler(callbackThreadLooper);
-    ShadowLooper shadowCallbackLooper = shadowOf(callbackThreadLooper);
-    // Pause the callback thread so that flush() never completes.
-    shadowCallbackLooper.pause();
-
-    // Send two input buffers to the callback, then an error, and then flush().
-    asynchronousMediaCodecCallback.onInputBufferAvailable(codec, 0);
-    asynchronousMediaCodecCallback.onInputBufferAvailable(codec, 1);
-    MediaCodec.CodecException expectedException = createCodecException();
-    asynchronousMediaCodecCallback.onError(codec, expectedException);
-    callbackHandler.post(() -> beforeFlushCompletes.set(true));
-    asynchronousMediaCodecCallback.flush();
-    callbackHandler.post(() -> flushCompleted.set(true));
-    while (!beforeFlushCompletes.get()) {
-      shadowCallbackLooper.runOneTask();
-    }
-
-    assertThat(flushCompleted.get()).isFalse();
-    MediaCodec.CodecException actualException =
-        assertThrows(
-            MediaCodec.CodecException.class,
-            () -> asynchronousMediaCodecCallback.dequeueInputBufferIndex());
-    assertThat(actualException).isSameInstanceAs(expectedException);
   }
 
   @Test
@@ -247,39 +216,6 @@ public class AsynchronousMediaCodecCallbackTest {
     assertThat(flushCompleted.get()).isFalse();
     assertThat(asynchronousMediaCodecCallback.dequeueOutputBufferIndex(new MediaCodec.BufferInfo()))
         .isEqualTo(MediaCodec.INFO_TRY_AGAIN_LATER);
-  }
-
-  @Test
-  public void dequeOutputBufferIndex_withPendingFlushAndError_throwsError() throws Exception {
-    AtomicBoolean beforeFlushCompletes = new AtomicBoolean();
-    AtomicBoolean flushCompleted = new AtomicBoolean();
-    Looper callbackThreadLooper = callbackThread.getLooper();
-    Handler callbackHandler = new Handler(callbackThreadLooper);
-    ShadowLooper shadowCallbackLooper = shadowOf(callbackThreadLooper);
-    // Pause the callback thread so that flush() never completes.
-    shadowCallbackLooper.pause();
-
-    // Send two output buffers to the callback, then an error, and then flush().
-    MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-    asynchronousMediaCodecCallback.onOutputBufferAvailable(codec, 0, bufferInfo);
-    asynchronousMediaCodecCallback.onOutputBufferAvailable(codec, 1, bufferInfo);
-    MediaCodec.CodecException expectedException = createCodecException();
-    asynchronousMediaCodecCallback.onError(codec, expectedException);
-    callbackHandler.post(() -> beforeFlushCompletes.set(true));
-    asynchronousMediaCodecCallback.flush();
-    callbackHandler.post(() -> flushCompleted.set(true));
-    while (beforeFlushCompletes.get()) {
-      shadowCallbackLooper.runOneTask();
-    }
-
-    assertThat(flushCompleted.get()).isFalse();
-    MediaCodec.CodecException actualException =
-        assertThrows(
-            MediaCodec.CodecException.class,
-            () ->
-                asynchronousMediaCodecCallback.dequeueOutputBufferIndex(
-                    new MediaCodec.BufferInfo()));
-    assertThat(actualException).isSameInstanceAs(expectedException);
   }
 
   @Test
@@ -502,24 +438,13 @@ public class AsynchronousMediaCodecCallbackTest {
   }
 
   @Test
-  public void flush_withPendingError_doesntResetError() throws Exception {
-    AtomicBoolean flushCompleted = new AtomicBoolean();
-    Looper callbackThreadLooper = callbackThread.getLooper();
-    ShadowLooper shadowCallbackLooper = shadowOf(callbackThreadLooper);
-
-    MediaCodec.CodecException expectedException = createCodecException();
-    asynchronousMediaCodecCallback.onError(codec, expectedException);
-    // Flush and progress the looper so that flush is completed.
+  public void flush_withPendingError_resetsError() throws Exception {
+    asynchronousMediaCodecCallback.onError(codec, createCodecException());
+    // Calling flush should clear any pending error.
     asynchronousMediaCodecCallback.flush();
-    new Handler(callbackThreadLooper).post(() -> flushCompleted.set(true));
-    shadowCallbackLooper.idle();
 
-    assertThat(flushCompleted.get()).isTrue();
-    MediaCodec.CodecException actualException =
-        assertThrows(
-            MediaCodec.CodecException.class,
-            () -> asynchronousMediaCodecCallback.dequeueInputBufferIndex());
-    assertThat(actualException).isSameInstanceAs(expectedException);
+    assertThat(asynchronousMediaCodecCallback.dequeueInputBufferIndex())
+        .isEqualTo(MediaCodec.INFO_TRY_AGAIN_LATER);
   }
 
   @Test
@@ -531,17 +456,13 @@ public class AsynchronousMediaCodecCallbackTest {
   }
 
   /** Reflectively create a {@link MediaCodec.CodecException}. */
-  private static MediaCodec.CodecException createCodecException()
-      throws NoSuchMethodException,
-          InvocationTargetException,
-          IllegalAccessException,
-          InstantiationException {
+  private static MediaCodec.CodecException createCodecException() throws Exception {
     Constructor<MediaCodec.CodecException> constructor =
         MediaCodec.CodecException.class.getDeclaredConstructor(
             Integer.TYPE, Integer.TYPE, String.class);
     constructor.setAccessible(true);
     return constructor.newInstance(
-        /* errorCode */ 0, /* actionCode */ 0, /* detailMessage */ "error from codec");
+        /* errorCode= */ 0, /* actionCode= */ 0, /* detailMessage= */ "error from codec");
   }
 
   private static MediaFormat createMediaFormat(String name) {

@@ -35,13 +35,11 @@ import androidx.media3.common.ParserException;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.decoder.DecoderInputBuffer;
 import androidx.media3.exoplayer.FormatHolder;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.drm.DrmSession;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
@@ -83,6 +81,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
@@ -110,8 +109,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     void onPrepared();
 
     /**
-     * Called to schedule a {@link #continueLoading(LoadingInfo)} call when the playlist referred by
-     * the given url changes.
+     * Called to schedule a {@link #continueLoading(long)} call when the playlist referred by the
+     * given url changes.
      */
     void onPlaylistRefreshRequired(Uri playlistUrl);
   }
@@ -259,7 +258,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   public void continuePreparing() {
     if (!prepared) {
-      continueLoading(new LoadingInfo.Builder().setPlaybackPositionUs(lastSeekPositionUs).build());
+      continueLoading(lastSeekPositionUs);
     }
   }
 
@@ -394,12 +393,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
           // If there's still a chance of avoiding a seek, try and seek within the sample queue.
           if (!seekRequired) {
             SampleQueue sampleQueue = sampleQueues[trackGroupToSampleQueueIndex[trackGroupIndex]];
-            // A seek can be avoided if we haven't read any samples yet (e.g. for the first track
-            // selection) or we are able to seek to the current playback position in the sample
-            // queue. In all other cases a seek is required.
+            // A seek can be avoided if we're able to seek to the current playback position in
+            // the sample queue, or if we haven't read anything from the queue since the previous
+            // seek (this case is common for sparse tracks such as metadata tracks). In all other
+            // cases a seek is required.
             seekRequired =
-                sampleQueue.getReadIndex() != 0
-                    && !sampleQueue.seekTo(positionUs, /* allowTimeBeyondBuffer= */ true);
+                !sampleQueue.seekTo(positionUs, /* allowTimeBeyondBuffer= */ true)
+                    && sampleQueue.getReadIndex() != 0;
           }
         }
       }
@@ -738,7 +738,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   }
 
   @Override
-  public boolean continueLoading(LoadingInfo loadingInfo) {
+  public boolean continueLoading(long positionUs) {
     if (loadingFinished || loader.isLoading() || loader.hasFatalError()) {
       return false;
     }
@@ -761,7 +761,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
     nextChunkHolder.clear();
     chunkSource.getNextChunk(
-        loadingInfo,
+        positionUs,
         loadPositionUs,
         chunkQueue,
         /* allowEndOfStream= */ prepared || !chunkQueue.isEmpty(),
@@ -863,7 +863,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loadable.startTimeUs,
         loadable.endTimeUs);
     if (!prepared) {
-      continueLoading(new LoadingInfo.Builder().setPlaybackPositionUs(lastSeekPositionUs).build());
+      continueLoading(lastSeekPositionUs);
     } else {
       callback.onContinueLoadingRequested(this);
     }
@@ -992,8 +992,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
     if (exclusionSucceeded) {
       if (!prepared) {
-        continueLoading(
-            new LoadingInfo.Builder().setPlaybackPositionUs(lastSeekPositionUs).build());
+        continueLoading(lastSeekPositionUs);
       } else {
         callback.onContinueLoadingRequested(this);
       }

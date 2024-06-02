@@ -15,7 +15,6 @@
  */
 package androidx.media3.test.utils;
 
-import static androidx.media3.common.util.Assertions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static junit.framework.TestCase.assertFalse;
@@ -51,7 +50,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
-import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Helper class to run an ExoPlayer test. */
 @UnstableApi
@@ -81,15 +79,15 @@ public final class ExoPlayerTestRunner implements Player.Listener, ActionSchedul
    */
   public static final class Builder {
     private final TestExoPlayerBuilder testPlayerBuilder;
-    private @MonotonicNonNull Timeline timeline;
+    private Timeline timeline;
     private List<MediaSource> mediaSources;
     private Format[] supportedFormats;
-    private @MonotonicNonNull Object manifest;
-    private @MonotonicNonNull ActionSchedule actionSchedule;
-    private @MonotonicNonNull Surface surface;
-    private Player.@MonotonicNonNull Listener playerListener;
-    private @MonotonicNonNull AnalyticsListener analyticsListener;
-    private @MonotonicNonNull Integer expectedPlayerEndedCount;
+    private Object manifest;
+    private ActionSchedule actionSchedule;
+    private Surface surface;
+    private Player.Listener playerListener;
+    private AnalyticsListener analyticsListener;
+    private Integer expectedPlayerEndedCount;
     private boolean pauseAtEndOfMediaItems;
     private int initialMediaItemIndex;
     private long initialPositionMs;
@@ -357,10 +355,7 @@ public final class ExoPlayerTestRunner implements Player.Listener, ActionSchedul
     public ExoPlayerTestRunner build() {
       if (mediaSources.isEmpty() && !skipSettingMediaSources) {
         if (timeline == null) {
-          timeline =
-              new FakeTimeline(
-                  /* windowCount= */ 1,
-                  manifest != null ? new Object[] {manifest} : new Object[] {});
+          timeline = new FakeTimeline(/* windowCount= */ 1, manifest);
         }
         mediaSources.add(new FakeMediaSource(timeline, supportedFormats));
       }
@@ -406,8 +401,8 @@ public final class ExoPlayerTestRunner implements Player.Listener, ActionSchedul
   private final ArrayList<Integer> playbackStates;
   private final boolean pauseAtEndOfMediaItems;
 
-  private @MonotonicNonNull ExoPlayer player;
-  private @MonotonicNonNull Exception exception;
+  private ExoPlayer player;
+  private Exception exception;
   private boolean playerWasPrepared;
 
   private ExoPlayerTestRunner(
@@ -473,7 +468,7 @@ public final class ExoPlayerTestRunner implements Player.Listener, ActionSchedul
     handler.post(
         () -> {
           try {
-            player = playerBuilder.setLooper(checkNotNull(Looper.myLooper())).build();
+            player = playerBuilder.setLooper(Looper.myLooper()).build();
             if (surface != null) {
               player.setVideoSurface(surface);
             }
@@ -656,7 +651,7 @@ public final class ExoPlayerTestRunner implements Player.Listener, ActionSchedul
   public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
     timelineChangeReasons.add(reason);
     timelines.add(timeline);
-    int currentIndex = checkNotNull(player).getCurrentPeriodIndex();
+    int currentIndex = player.getCurrentPeriodIndex();
     if (periodIndices.isEmpty() || periodIndices.get(periodIndices.size() - 1) != currentIndex) {
       // Ignore timeline changes that do not change the period index.
       periodIndices.add(currentIndex);
@@ -666,9 +661,7 @@ public final class ExoPlayerTestRunner implements Player.Listener, ActionSchedul
   @Override
   public void onMediaItemTransition(
       @Nullable MediaItem mediaItem, @Player.MediaItemTransitionReason int reason) {
-    if (mediaItem != null) {
-      mediaItems.add(mediaItem);
-    }
+    mediaItems.add(mediaItem);
     mediaItemTransitionReasons.add(reason);
   }
 
@@ -693,7 +686,7 @@ public final class ExoPlayerTestRunner implements Player.Listener, ActionSchedul
       Player.PositionInfo newPosition,
       @Player.DiscontinuityReason int reason) {
     discontinuityReasons.add(reason);
-    int currentIndex = checkNotNull(player).getCurrentPeriodIndex();
+    int currentIndex = player.getCurrentPeriodIndex();
     if ((reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION
             && oldPosition.adGroupIndex != C.INDEX_UNSET
             && newPosition.adGroupIndex != C.INDEX_UNSET)

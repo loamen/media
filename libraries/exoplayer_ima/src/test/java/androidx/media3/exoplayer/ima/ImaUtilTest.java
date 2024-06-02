@@ -2046,7 +2046,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 0, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 0,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(0, 0));
 
     adPlaybackState =
@@ -2078,7 +2081,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 2, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 2,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(1, 0));
 
     adPlaybackState =
@@ -2086,7 +2092,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 3, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 3,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(1, 1));
 
     adPlaybackState =
@@ -2094,7 +2103,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 4, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 4,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(1, 2));
 
     adPlaybackState =
@@ -2110,7 +2122,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 6, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 6,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(2, 0));
   }
 
@@ -2176,7 +2191,10 @@ public class ImaUtilTest {
         IllegalStateException.class,
         () ->
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 1, finalAdPlaybackState, contentTimeline));
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 1,
+                contentTimeline,
+                finalAdPlaybackState));
 
     adPlaybackState =
         adPlaybackState.withPlayedAd(/* adGroupIndex= */ 1, /* adIndexInAdGroup= */ 0);
@@ -2198,7 +2216,10 @@ public class ImaUtilTest {
         IllegalStateException.class,
         () ->
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 5, anotherFinalAdPlaybackState, contentTimeline));
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 5,
+                contentTimeline,
+                anotherFinalAdPlaybackState));
   }
 
   @Test
@@ -2254,7 +2275,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 0, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 0,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(0, 2));
   }
 
@@ -2306,7 +2330,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 0, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 0,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(0, 1));
 
     // Ad event for second ad in window arrives.
@@ -2323,7 +2350,10 @@ public class ImaUtilTest {
 
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 1, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 1,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(0, 2));
 
     // Move one ad period forward: c, a, a, [a, a, a, a], c
@@ -2332,13 +2362,19 @@ public class ImaUtilTest {
         adPlaybackState.withPlayedAd(/* adGroupIndex= */ 0, /* adIndexInAdGroup= */ 2);
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 1, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 1,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(0, 3));
     adPlaybackState =
         adPlaybackState.withPlayedAd(/* adGroupIndex= */ 0, /* adIndexInAdGroup= */ 3);
     assertThat(
             getAdGroupAndIndexInLiveMultiPeriodTimeline(
-                /* adPeriodIndex= */ 2, adPlaybackState, contentTimeline))
+                /* currentMediaItemIndex= */ 0,
+                /* adPeriodIndex= */ 2,
+                contentTimeline,
+                adPlaybackState))
         .isEqualTo(new Pair<>(0, 4));
   }
 

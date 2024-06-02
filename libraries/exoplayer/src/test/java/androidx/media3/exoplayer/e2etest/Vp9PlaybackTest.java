@@ -62,8 +62,7 @@ public final class Vp9PlaybackTest {
         new ExoPlayer.Builder(applicationContext, capturingRenderersFactory)
             .setClock(new FakeClock(/* isAutoAdvancing= */ true))
             .build();
-    Surface surface = new Surface(new SurfaceTexture(/* texName= */ 1));
-    player.setVideoSurface(surface);
+    player.setVideoSurface(new Surface(new SurfaceTexture(/* texName= */ 1)));
     PlaybackOutput playbackOutput = PlaybackOutput.register(player, capturingRenderersFactory);
 
     player.setMediaItem(MediaItem.fromUri("asset:///media/vp9/" + inputFile));
@@ -71,7 +70,6 @@ public final class Vp9PlaybackTest {
     player.play();
     TestPlayerRunHelper.runUntilPlaybackState(player, Player.STATE_ENDED);
     player.release();
-    surface.release();
 
     DumpFileAsserts.assertOutput(
         applicationContext, playbackOutput, "playbackdumps/vp9/" + inputFile + ".dump");

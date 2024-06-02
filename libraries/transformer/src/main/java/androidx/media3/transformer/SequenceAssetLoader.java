@@ -35,7 +35,6 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.OnInputFrameProcessedListener;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.HandlerWrapper;
-import androidx.media3.common.util.TimestampIterator;
 import androidx.media3.decoder.DecoderInputBuffer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -63,15 +62,13 @@ import java.util.concurrent.atomic.AtomicInteger;
   private final AssetLoader.Factory assetLoaderFactory;
   private final HandlerWrapper handler;
   private final Listener sequenceAssetLoaderListener;
-
   /**
    * A mapping from track types to {@link SampleConsumer} instances.
    *
    * <p>This map never contains more than 2 entries, as the only track types allowed are audio and
    * video.
    */
-  private final Map<Integer, SampleConsumerWrapper> sampleConsumersByTrackType;
-
+  private final Map<Integer, SampleConsumer> sampleConsumersByTrackType;
   /**
    * A mapping from track types to {@link OnMediaItemChangedListener} instances.
    *
@@ -89,7 +86,10 @@ import java.util.concurrent.atomic.AtomicInteger;
   private boolean trackCountReported;
   private boolean decodeAudio;
   private boolean decodeVideo;
+  private long totalDurationUs;
   private int sequenceLoopCount;
+  private boolean audioLoopingEnded;
+  private boolean videoLoopingEnded;
   private int processedInputsSize;
   private boolean released;
 
@@ -231,7 +231,6 @@ import java.util.concurrent.atomic.AtomicInteger;
     if (addForcedAudioTrack) {
       sequenceAssetLoaderListener.onTrackAdded(
           FORCE_AUDIO_TRACK_FORMAT, SUPPORTED_OUTPUT_TYPE_DECODED);
-      decodeAudio = true;
     }
 
     return decodeOutput;
@@ -239,9 +238,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
   @Nullable
   @Override
-  public SampleConsumerWrapper onOutputFormat(Format format) throws ExportException {
+  public SampleConsumer onOutputFormat(Format format) throws ExportException {
     @C.TrackType int trackType = getProcessedTrackType(format.sampleMimeType);
-    SampleConsumerWrapper sampleConsumer;
+    SampleConsumer sampleConsumer;
     if (isCurrentAssetFirstAsset) {
       @Nullable
       SampleConsumer wrappedSampleConsumer = sequenceAssetLoaderListener.onOutputFormat(format);
@@ -279,8 +278,7 @@ import java.util.concurrent.atomic.AtomicInteger;
     }
     onMediaItemChanged(trackType, format);
     if (nonEndedTracks.get() == 1 && sampleConsumersByTrackType.size() == 2) {
-      for (Map.Entry<Integer, SampleConsumerWrapper> entry :
-          sampleConsumersByTrackType.entrySet()) {
+      for (Map.Entry<Integer, SampleConsumer> entry : sampleConsumersByTrackType.entrySet()) {
         int outputTrackType = entry.getKey();
         if (trackType != outputTrackType) {
           onMediaItemChanged(outputTrackType, /* format= */ null);
@@ -351,10 +349,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
     private final SampleConsumer sampleConsumer;
 
-    private long totalDurationUs;
-    private boolean audioLoopingEnded;
-    private boolean videoLoopingEnded;
-
     public SampleConsumerWrapper(SampleConsumer sampleConsumer) {
       this.sampleConsumer = sampleConsumer;
     }
@@ -369,7 +363,7 @@ import java.util.concurrent.atomic.AtomicInteger;
     public boolean queueInputBuffer() {
       DecoderInputBuffer inputBuffer = checkStateNotNull(sampleConsumer.getInputBuffer());
       long globalTimestampUs = totalDurationUs + inputBuffer.timeUs;
-      if (isLooping && (globalTimestampUs >= maxSequenceDurationUs || audioLoopingEnded)) {
+      if (isLooping && globalTimestampUs >= maxSequenceDurationUs) {
         if (isMaxSequenceDurationUsFinal && !audioLoopingEnded) {
           checkNotNull(inputBuffer.data).limit(0);
           inputBuffer.setFlags(C.BUFFER_FLAG_END_OF_STREAM);
@@ -398,33 +392,26 @@ import java.util.concurrent.atomic.AtomicInteger;
       return true;
     }
 
+    // TODO(b/262693274): Test that concatenate 2 images or an image and a video works as expected
+    //  once ImageAssetLoader implementation is complete.
     @Override
-    public @InputResult int queueInputBitmap(
-        Bitmap inputBitmap, TimestampIterator inStreamOffsetsUs) {
-      if (isLooping) {
-        long lastOffsetUs = C.TIME_UNSET;
-        while (inStreamOffsetsUs.hasNext()) {
-          long offsetUs = inStreamOffsetsUs.next();
-          if (totalDurationUs + offsetUs > maxSequenceDurationUs) {
-            if (!isMaxSequenceDurationUsFinal) {
-              return INPUT_RESULT_TRY_AGAIN_LATER;
-            }
-            if (lastOffsetUs == C.TIME_UNSET) {
-              if (!videoLoopingEnded) {
-                videoLoopingEnded = true;
-                signalEndOfVideoInput();
-                return INPUT_RESULT_END_OF_STREAM;
-              }
-              return INPUT_RESULT_TRY_AGAIN_LATER;
-            }
-            inStreamOffsetsUs = new ClippingIterator(inStreamOffsetsUs.copyOf(), lastOffsetUs);
-            videoLoopingEnded = true;
-            break;
-          }
-          lastOffsetUs = offsetUs;
+    public boolean queueInputBitmap(Bitmap inputBitmap, long durationUs, int frameRate) {
+      if (isLooping && totalDurationUs + durationUs > maxSequenceDurationUs) {
+        if (!isMaxSequenceDurationUsFinal) {
+          return false;
         }
+        durationUs = maxSequenceDurationUs - totalDurationUs;
+        if (durationUs == 0) {
+          if (!videoLoopingEnded) {
+            videoLoopingEnded = true;
+            signalEndOfVideoInput();
+          }
+          return false;
+        }
+        videoLoopingEnded = true;
       }
-      return sampleConsumer.queueInputBitmap(inputBitmap, inStreamOffsetsUs.copyOf());
+
+      return sampleConsumer.queueInputBitmap(inputBitmap, durationUs, frameRate);
     }
 
     @Override
@@ -433,15 +420,14 @@ import java.util.concurrent.atomic.AtomicInteger;
     }
 
     @Override
-    public @InputResult int queueInputTexture(int texId, long presentationTimeUs) {
+    public boolean queueInputTexture(int texId, long presentationTimeUs) {
       long globalTimestampUs = totalDurationUs + presentationTimeUs;
       if (isLooping && globalTimestampUs >= maxSequenceDurationUs) {
         if (isMaxSequenceDurationUsFinal && !videoLoopingEnded) {
           videoLoopingEnded = true;
           signalEndOfVideoInput();
-          return INPUT_RESULT_END_OF_STREAM;
         }
-        return INPUT_RESULT_TRY_AGAIN_LATER;
+        return false;
       }
       return sampleConsumer.queueInputTexture(texId, presentationTimeUs);
     }
@@ -515,42 +501,6 @@ import java.util.concurrent.atomic.AtomicInteger;
                   ExportException.createForAssetLoader(e, ExportException.ERROR_CODE_UNSPECIFIED));
             }
           });
-    }
-  }
-
-  /**
-   * Wraps a {@link TimestampIterator}, providing all the values in the original timestamp iterator
-   * (in the same order) up to and including the first occurrence of the {@code clippingValue}.
-   */
-  private static final class ClippingIterator implements TimestampIterator {
-
-    private final TimestampIterator iterator;
-    private final long clippingValue;
-    private boolean hasReachedClippingValue;
-
-    public ClippingIterator(TimestampIterator iterator, long clippingValue) {
-      this.iterator = iterator;
-      this.clippingValue = clippingValue;
-    }
-
-    @Override
-    public boolean hasNext() {
-      return !hasReachedClippingValue && iterator.hasNext();
-    }
-
-    @Override
-    public long next() {
-      checkState(hasNext());
-      long next = iterator.next();
-      if (clippingValue <= next) {
-        hasReachedClippingValue = true;
-      }
-      return next;
-    }
-
-    @Override
-    public TimestampIterator copyOf() {
-      return new ClippingIterator(iterator.copyOf(), clippingValue);
     }
   }
 }

@@ -15,7 +15,6 @@
  */
 package androidx.media3.effect;
 
-import androidx.media3.common.GlObjectsProvider;
 import androidx.media3.common.GlTextureInfo;
 import androidx.media3.effect.GlShaderProgram.InputListener;
 import androidx.media3.effect.GlShaderProgram.OutputListener;
@@ -36,7 +35,6 @@ import androidx.media3.effect.GlShaderProgram.OutputListener;
   /**
    * Creates a new instance.
    *
-   * @param glObjectsProvider The {@link GlObjectsProvider} for using EGL and GLES.
    * @param producingGlShaderProgram The {@link GlShaderProgram} for which this listener will be set
    *     as {@link OutputListener}.
    * @param consumingGlShaderProgram The {@link GlShaderProgram} for which this listener will be set
@@ -47,14 +45,12 @@ import androidx.media3.effect.GlShaderProgram.OutputListener;
    *     releasing the {@link VideoFrameProcessingTaskExecutor}.
    */
   public ChainingGlShaderProgramListener(
-      GlObjectsProvider glObjectsProvider,
       GlShaderProgram producingGlShaderProgram,
       GlShaderProgram consumingGlShaderProgram,
       VideoFrameProcessingTaskExecutor videoFrameProcessingTaskExecutor) {
     this.producingGlShaderProgram = producingGlShaderProgram;
     frameConsumptionManager =
-        new FrameConsumptionManager(
-            glObjectsProvider, consumingGlShaderProgram, videoFrameProcessingTaskExecutor);
+        new FrameConsumptionManager(consumingGlShaderProgram, videoFrameProcessingTaskExecutor);
     this.videoFrameProcessingTaskExecutor = videoFrameProcessingTaskExecutor;
   }
 

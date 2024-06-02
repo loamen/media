@@ -87,7 +87,7 @@ public final class DvbSubtitleReader implements ElementaryStreamReader {
   }
 
   @Override
-  public void packetFinished(boolean isEndOfInput) {
+  public void packetFinished() {
     if (writingSample) {
       if (sampleTimeUs != C.TIME_UNSET) {
         for (TrackOutput output : outputs) {

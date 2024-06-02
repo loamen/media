@@ -34,10 +34,8 @@ import androidx.media3.common.util.GlUtil;
 import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.mediacodec.MediaCodecUtil;
 import androidx.media3.transformer.AndroidTestUtil;
-import androidx.media3.transformer.Composition;
-import androidx.media3.transformer.EditedMediaItem;
-import androidx.media3.transformer.EditedMediaItemSequence;
 import androidx.media3.transformer.ExportTestResult;
+import androidx.media3.transformer.TransformationRequest;
 import androidx.media3.transformer.Transformer;
 import androidx.media3.transformer.TransformerAndroidTestRunner;
 import androidx.test.core.app.ApplicationProvider;
@@ -49,7 +47,7 @@ import org.junit.runner.RunWith;
 
 /**
  * {@link Transformer} instrumentation test for applying an {@linkplain
- * Composition#HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL HDR to SDR tone mapping edit}.
+ * TransformationRequest#HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL HDR to SDR tone mapping edit}.
  */
 @RunWith(AndroidJUnit4.class)
 public class ToneMapHdrToSdrUsingOpenGlTest {
@@ -90,17 +88,17 @@ public class ToneMapHdrToSdrUsingOpenGlTest {
   }
 
   private void runTransformerWithOpenGlToneMapping(String testId, String fileUri) throws Exception {
-    Transformer transformer = new Transformer.Builder(context).build();
-    Composition composition =
-        new Composition.Builder(
-                new EditedMediaItemSequence(
-                    new EditedMediaItem.Builder(MediaItem.fromUri(fileUri)).build()))
-            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+    Transformer transformer =
+        new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder()
+                    .setHdrMode(TransformationRequest.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+                    .build())
             .build();
     ExportTestResult exportTestResult =
         new TransformerAndroidTestRunner.Builder(context, transformer)
             .build()
-            .run(testId, composition);
+            .run(testId, MediaItem.fromUri(fileUri));
     assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
   }
 

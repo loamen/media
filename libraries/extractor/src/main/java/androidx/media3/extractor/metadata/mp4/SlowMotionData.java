@@ -46,10 +46,8 @@ public final class SlowMotionData implements Metadata.Entry {
 
     /** The start time, in milliseconds, of the track segment that is intended to be slow motion. */
     public final long startTimeMs;
-
     /** The end time, in milliseconds, of the track segment that is intended to be slow motion. */
     public final long endTimeMs;
-
     /**
      * The speed reduction factor.
      *

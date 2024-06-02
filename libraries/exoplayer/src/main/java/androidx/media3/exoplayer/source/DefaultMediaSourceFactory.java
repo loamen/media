@@ -29,7 +29,6 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
@@ -38,6 +37,7 @@ import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
 import androidx.media3.exoplayer.source.ads.AdsLoader;
 import androidx.media3.exoplayer.source.ads.AdsMediaSource;
+import androidx.media3.exoplayer.text.SubtitleDecoderFactory;
 import androidx.media3.exoplayer.upstream.CmcdConfiguration;
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy;
 import androidx.media3.extractor.DefaultExtractorsFactory;
@@ -48,8 +48,6 @@ import androidx.media3.extractor.ExtractorsFactory;
 import androidx.media3.extractor.PositionHolder;
 import androidx.media3.extractor.SeekMap;
 import androidx.media3.extractor.TrackOutput;
-import androidx.media3.extractor.jpeg.JpegExtractor;
-import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
 import androidx.media3.extractor.text.SubtitleExtractor;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
@@ -61,6 +59,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
@@ -439,9 +438,6 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
     int type =
         Util.inferContentTypeForUriAndMimeType(
             mediaItem.localConfiguration.uri, mediaItem.localConfiguration.mimeType);
-    if (mediaItem.localConfiguration.imageDurationMs != C.TIME_UNSET) {
-      delegateFactoryLoader.setJpegExtractorFlags(JpegExtractor.FLAG_READ_IMAGE);
-    }
     @Nullable
     MediaSource.Factory mediaSourceFactory = delegateFactoryLoader.getMediaSourceFactory(type);
     checkStateNotNull(
@@ -488,12 +484,12 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
                   .setLabel(subtitleConfigurations.get(i).label)
                   .setId(subtitleConfigurations.get(i).id)
                   .build();
-          DefaultSubtitleParserFactory subtitleParserFactory = new DefaultSubtitleParserFactory();
           ExtractorsFactory extractorsFactory =
               () ->
                   new Extractor[] {
-                    subtitleParserFactory.supportsFormat(format)
-                        ? new SubtitleExtractor(subtitleParserFactory.create(format), format)
+                    SubtitleDecoderFactory.DEFAULT.supportsFormat(format)
+                        ? new SubtitleExtractor(
+                            SubtitleDecoderFactory.DEFAULT.createDecoder(format), format)
                         : new UnknownSubtitlesExtractor(format)
                   };
           ProgressiveMediaSource.Factory progressiveMediaSourceFactory =
@@ -651,12 +647,6 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
       this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
       for (MediaSource.Factory mediaSourceFactory : mediaSourceFactories.values()) {
         mediaSourceFactory.setLoadErrorHandlingPolicy(loadErrorHandlingPolicy);
-      }
-    }
-
-    public void setJpegExtractorFlags(@JpegExtractor.Flags int flags) {
-      if (this.extractorsFactory instanceof DefaultExtractorsFactory) {
-        ((DefaultExtractorsFactory) this.extractorsFactory).setJpegExtractorFlags(flags);
       }
     }
 

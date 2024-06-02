@@ -28,6 +28,7 @@ import androidx.media3.transformer.AndroidTestUtil;
 import androidx.media3.transformer.DefaultEncoderFactory;
 import androidx.media3.transformer.EditedMediaItem;
 import androidx.media3.transformer.ExportTestResult;
+import androidx.media3.transformer.TransformationRequest;
 import androidx.media3.transformer.Transformer;
 import androidx.media3.transformer.TransformerAndroidTestRunner;
 import androidx.media3.transformer.VideoEncoderSettings;
@@ -57,7 +58,8 @@ public final class TranscodeQualityTest {
 
     Transformer transformer =
         new Transformer.Builder(context)
-            .setVideoMimeType(MimeTypes.VIDEO_H264)
+            .setTransformationRequest(
+                new TransformationRequest.Builder().setVideoMimeType(MimeTypes.VIDEO_H264).build())
             .setEncoderFactory(
                 new DefaultEncoderFactory.Builder(context)
                     .setRequestedVideoEncoderSettings(
@@ -102,7 +104,10 @@ public final class TranscodeQualityTest {
     assumeTrue(!Util.MODEL.equals("SM-F711U1") && !Util.MODEL.equals("SM-F926U1"));
 
     Transformer transformer =
-        new Transformer.Builder(context).setVideoMimeType(MimeTypes.VIDEO_H265).build();
+        new Transformer.Builder(context)
+            .setTransformationRequest(
+                new TransformationRequest.Builder().setVideoMimeType(MimeTypes.VIDEO_H265).build())
+            .build();
     MediaItem mediaItem =
         MediaItem.fromUri(
             Uri.parse(AndroidTestUtil.MP4_ASSET_WITH_INCREASING_TIMESTAMPS_URI_STRING));
@@ -130,7 +135,8 @@ public final class TranscodeQualityTest {
 
     Transformer transformer =
         new Transformer.Builder(context)
-            .setVideoMimeType(MimeTypes.VIDEO_H264)
+            .setTransformationRequest(
+                new TransformationRequest.Builder().setVideoMimeType(MimeTypes.VIDEO_H264).build())
             .setEncoderFactory(new AndroidTestUtil.ForceEncodeEncoderFactory(context))
             .build();
     MediaItem mediaItem =

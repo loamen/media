@@ -105,7 +105,7 @@ public final class Gav1Decoder
           "gav1Decode error: " + gav1GetErrorMessage(gav1DecoderContext));
     }
 
-    boolean decodeOnly = !isAtLeastOutputStartTimeUs(inputBuffer.timeUs);
+    boolean decodeOnly = inputBuffer.isDecodeOnly();
     if (!decodeOnly) {
       outputBuffer.init(inputBuffer.timeUs, outputMode, /* supplementalData= */ null);
     }
@@ -117,7 +117,7 @@ public final class Gav1Decoder
           "gav1GetFrame error: " + gav1GetErrorMessage(gav1DecoderContext));
     }
     if (getFrameResult == GAV1_DECODE_ONLY) {
-      outputBuffer.shouldBeSkipped = true;
+      outputBuffer.addFlag(C.BUFFER_FLAG_DECODE_ONLY);
     }
     if (!decodeOnly) {
       outputBuffer.format = inputBuffer.format;
@@ -139,9 +139,9 @@ public final class Gav1Decoder
 
   @Override
   protected void releaseOutputBuffer(VideoDecoderOutputBuffer outputBuffer) {
-    // Skipped frames do not acquire a reference on the internal decoder buffer and thus do not
+    // Decode only frames do not acquire a reference on the internal decoder buffer and thus do not
     // require a call to gav1ReleaseFrame.
-    if (outputBuffer.mode == C.VIDEO_OUTPUT_MODE_SURFACE_YUV && !outputBuffer.shouldBeSkipped) {
+    if (outputBuffer.mode == C.VIDEO_OUTPUT_MODE_SURFACE_YUV && !outputBuffer.isDecodeOnly()) {
       gav1ReleaseFrame(gav1DecoderContext, outputBuffer);
     }
     super.releaseOutputBuffer(outputBuffer);

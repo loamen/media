@@ -70,8 +70,7 @@ public abstract class SimpleSubtitleDecoder
     return new SubtitleDecoderException("Unexpected decode error", error);
   }
 
-  // Clearing deprecated decode-only flag for compatibility with decoders that are still using it.
-  @SuppressWarnings({"ByteBufferBackingArray", "deprecation"})
+  @SuppressWarnings("ByteBufferBackingArray")
   @Override
   @Nullable
   protected final SubtitleDecoderException decode(

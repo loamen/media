@@ -23,19 +23,16 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
-import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C.TRACK_TYPE_TEXT
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
-import androidx.media3.common.Player.EVENT_MEDIA_ITEM_TRANSITION
-import androidx.media3.common.Player.EVENT_MEDIA_METADATA_CHANGED
-import androidx.media3.common.Player.EVENT_TIMELINE_CHANGED
-import androidx.media3.common.Player.EVENT_TRACKS_CHANGED
-import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
@@ -45,8 +42,7 @@ import com.google.common.util.concurrent.MoreExecutors
 class PlayerActivity : AppCompatActivity() {
   private lateinit var controllerFuture: ListenableFuture<MediaController>
   private val controller: MediaController?
-    get() =
-      if (controllerFuture.isDone && !controllerFuture.isCancelled) controllerFuture.get() else null
+    get() = if (controllerFuture.isDone) controllerFuture.get() else null
 
   private lateinit var playerView: PlayerView
   private lateinit var mediaItemListView: ListView
@@ -67,7 +63,6 @@ class PlayerActivity : AppCompatActivity() {
         val controller = this.controller ?: return@run
         if (controller.currentMediaItemIndex == position) {
           controller.playWhenReady = !controller.playWhenReady
-          @OptIn(UnstableApi::class) // PlayerView.hideController
           if (controller.playWhenReady) {
             playerView.hideController()
           }
@@ -97,7 +92,6 @@ class PlayerActivity : AppCompatActivity() {
           SessionToken(this, ComponentName(this, PlaybackService::class.java))
         )
         .buildAsync()
-    updateMediaMetadataUI()
     controllerFuture.addListener({ setController() }, MoreExecutors.directExecutor())
   }
 
@@ -105,50 +99,36 @@ class PlayerActivity : AppCompatActivity() {
     MediaController.releaseFuture(controllerFuture)
   }
 
-  @OptIn(UnstableApi::class) // PlayerView.setShowSubtitleButton
   private fun setController() {
     val controller = this.controller ?: return
 
     playerView.player = controller
 
     updateCurrentPlaylistUI()
-    updateMediaMetadataUI()
+    updateMediaMetadataUI(controller.mediaMetadata)
     playerView.setShowSubtitleButton(controller.currentTracks.isTypeSupported(TRACK_TYPE_TEXT))
 
     controller.addListener(
       object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) {
-          if (events.contains(EVENT_TRACKS_CHANGED)) {
-            playerView.setShowSubtitleButton(player.currentTracks.isTypeSupported(TRACK_TYPE_TEXT))
-          }
-          if (events.contains(EVENT_TIMELINE_CHANGED)) {
-            updateCurrentPlaylistUI()
-          }
-          if (events.contains(EVENT_MEDIA_METADATA_CHANGED)) {
-            updateMediaMetadataUI()
-          }
-          if (events.contains(EVENT_MEDIA_ITEM_TRANSITION)) {
-            // Trigger adapter update to change highlight of current item.
-            mediaItemListAdapter.notifyDataSetChanged()
-          }
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+          updateMediaMetadataUI(mediaItem?.mediaMetadata ?: MediaMetadata.EMPTY)
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+          playerView.setShowSubtitleButton(tracks.isTypeSupported(TRACK_TYPE_TEXT))
         }
       }
     )
   }
 
-  private fun updateMediaMetadataUI() {
-    val controller = this.controller
-    if (controller == null || controller.mediaItemCount == 0) {
-      findViewById<TextView>(R.id.media_title).text = getString(R.string.waiting_for_metadata)
-      findViewById<TextView>(R.id.media_artist).text = ""
-      return
-    }
-
-    val mediaMetadata = controller.mediaMetadata
+  private fun updateMediaMetadataUI(mediaMetadata: MediaMetadata) {
     val title: CharSequence = mediaMetadata.title ?: ""
 
     findViewById<TextView>(R.id.media_title).text = title
     findViewById<TextView>(R.id.media_artist).text = mediaMetadata.artist
+
+    // Trick to update playlist UI
+    mediaItemListAdapter.notifyDataSetChanged()
   }
 
   private fun updateCurrentPlaylistUI() {

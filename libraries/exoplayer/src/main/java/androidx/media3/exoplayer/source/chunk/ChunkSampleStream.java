@@ -28,7 +28,6 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.decoder.DecoderInputBuffer;
 import androidx.media3.exoplayer.FormatHolder;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.drm.DrmSession;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
@@ -562,7 +561,7 @@ public class ChunkSampleStream<T extends ChunkSource>
   // SequenceableLoader implementation
 
   @Override
-  public boolean continueLoading(LoadingInfo loadingInfo) {
+  public boolean continueLoading(long positionUs) {
     if (loadingFinished || loader.isLoading() || loader.hasFatalError()) {
       return false;
     }
@@ -577,7 +576,7 @@ public class ChunkSampleStream<T extends ChunkSource>
       chunkQueue = readOnlyMediaChunks;
       loadPositionUs = getLastMediaChunk().endTimeUs;
     }
-    chunkSource.getNextChunk(loadingInfo, loadPositionUs, chunkQueue, nextChunkHolder);
+    chunkSource.getNextChunk(positionUs, loadPositionUs, chunkQueue, nextChunkHolder);
     boolean endOfStream = nextChunkHolder.endOfStream;
     @Nullable Chunk loadable = nextChunkHolder.chunk;
     nextChunkHolder.clear();

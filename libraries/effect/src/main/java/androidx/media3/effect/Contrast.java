@@ -23,7 +23,7 @@ import androidx.media3.common.util.UnstableApi;
 
 /** A {@link RgbMatrix} to control the contrast of video frames. */
 @UnstableApi
-public final class Contrast implements RgbMatrix {
+public class Contrast implements RgbMatrix {
 
   /** Adjusts the contrast of video frames in the interval [-1, 1]. */
   private final float contrast;

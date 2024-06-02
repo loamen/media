@@ -23,7 +23,7 @@ import androidx.media3.common.util.UnstableApi;
 
 /** Drops frames to lower average frame rate to around {@code targetFrameRate}. */
 @UnstableApi
-public final class FrameDropEffect implements GlEffect {
+public class FrameDropEffect implements GlEffect {
 
   private final float inputFrameRate;
   private final float targetFrameRate;

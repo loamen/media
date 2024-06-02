@@ -95,7 +95,6 @@ public class TextureAssetLoaderTest {
             try {
               Thread.sleep(10);
             } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
               exceptionRef.set(e);
             }
           }
@@ -131,7 +130,7 @@ public class TextureAssetLoaderTest {
             .setDurationUs(C.MICROS_PER_SECOND)
             .build();
     Format format = new Format.Builder().setWidth(10).setHeight(10).build();
-    OnInputFrameProcessedListener frameProcessedListener = (unused, unused2) -> {};
+    OnInputFrameProcessedListener frameProcessedListener = unused -> {};
     return new TextureAssetLoader(editedMediaItem, listener, format, frameProcessedListener);
   }
 
@@ -141,8 +140,8 @@ public class TextureAssetLoaderTest {
     public void setOnInputFrameProcessedListener(OnInputFrameProcessedListener listener) {}
 
     @Override
-    public @InputResult int queueInputTexture(int texId, long presentationTimeUs) {
-      return INPUT_RESULT_SUCCESS;
+    public boolean queueInputTexture(int texId, long presentationTimeUs) {
+      return true;
     }
 
     @Override

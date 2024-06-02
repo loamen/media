@@ -22,7 +22,6 @@ import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.AuxEffectInfo;
 import androidx.media3.common.Format;
 import androidx.media3.common.PlaybackParameters;
-import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import java.nio.ByteBuffer;
@@ -48,11 +47,6 @@ public class ForwardingAudioSink implements AudioSink {
   }
 
   @Override
-  public void setClock(Clock clock) {
-    sink.setClock(clock);
-  }
-
-  @Override
   public boolean supportsFormat(Format format) {
     return sink.supportsFormat(format);
   }
@@ -60,11 +54,6 @@ public class ForwardingAudioSink implements AudioSink {
   @Override
   public @SinkFormatSupport int getFormatSupport(Format format) {
     return sink.getFormatSupport(format);
-  }
-
-  @Override
-  public AudioOffloadSupport getFormatOffloadSupport(Format format) {
-    return sink.getFormatOffloadSupport(format);
   }
 
   @Override
@@ -173,18 +162,6 @@ public class ForwardingAudioSink implements AudioSink {
   }
 
   @Override
-  @RequiresApi(29)
-  public void setOffloadMode(@OffloadMode int offloadMode) {
-    sink.setOffloadMode(offloadMode);
-  }
-
-  @Override
-  @RequiresApi(29)
-  public void setOffloadDelayPadding(int delayInFrames, int paddingInFrames) {
-    sink.setOffloadDelayPadding(delayInFrames, paddingInFrames);
-  }
-
-  @Override
   public void setVolume(float volume) {
     sink.setVolume(volume);
   }
@@ -197,6 +174,11 @@ public class ForwardingAudioSink implements AudioSink {
   @Override
   public void flush() {
     sink.flush();
+  }
+
+  @Override
+  public void experimentalFlushWithoutAudioTrackRelease() {
+    sink.experimentalFlushWithoutAudioTrackRelease();
   }
 
   @Override

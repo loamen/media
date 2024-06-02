@@ -25,7 +25,6 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.TransferListener;
-import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.source.chunk.Chunk;
 import androidx.media3.exoplayer.source.chunk.ChunkHolder;
@@ -109,11 +108,10 @@ public class FakeChunkSource implements ChunkSource {
 
   @Override
   public void getNextChunk(
-      LoadingInfo loadingInfo,
+      long playbackPositionUs,
       long loadPositionUs,
       List<? extends MediaChunk> queue,
       ChunkHolder out) {
-    long playbackPositionUs = loadingInfo.playbackPositionUs;
     long bufferedDurationUs = loadPositionUs - playbackPositionUs;
     int chunkIndex =
         queue.isEmpty()

@@ -58,8 +58,6 @@ public final class AvcConfig {
 
       int width = Format.NO_VALUE;
       int height = Format.NO_VALUE;
-      int bitdepthLuma = Format.NO_VALUE;
-      int bitdepthChroma = Format.NO_VALUE;
       @C.ColorSpace int colorSpace = Format.NO_VALUE;
       @C.ColorRange int colorRange = Format.NO_VALUE;
       @C.ColorTransfer int colorTransfer = Format.NO_VALUE;
@@ -72,8 +70,6 @@ public final class AvcConfig {
                 initializationData.get(0), nalUnitLengthFieldLength, sps.length);
         width = spsData.width;
         height = spsData.height;
-        bitdepthLuma = spsData.bitDepthLumaMinus8 + 8;
-        bitdepthChroma = spsData.bitDepthChromaMinus8 + 8;
         colorSpace = spsData.colorSpace;
         colorRange = spsData.colorRange;
         colorTransfer = spsData.colorTransfer;
@@ -88,8 +84,6 @@ public final class AvcConfig {
           nalUnitLengthFieldLength,
           width,
           height,
-          bitdepthLuma,
-          bitdepthChroma,
           colorSpace,
           colorRange,
           colorTransfer,
@@ -115,12 +109,6 @@ public final class AvcConfig {
 
   /** The height of each decoded frame, or {@link Format#NO_VALUE} if unknown. */
   public final int height;
-
-  /** The bit depth of the luma samples, or {@link Format#NO_VALUE} if unknown. */
-  public final int bitdepthLuma;
-
-  /** The bit depth of the chroma samples, or {@link Format#NO_VALUE} if unknown. */
-  public final int bitdepthChroma;
 
   /**
    * The {@link C.ColorSpace} of the video, or {@link Format#NO_VALUE} if unknown or not applicable.
@@ -153,8 +141,6 @@ public final class AvcConfig {
       int nalUnitLengthFieldLength,
       int width,
       int height,
-      int bitdepthLuma,
-      int bitdepthChroma,
       @C.ColorSpace int colorSpace,
       @C.ColorRange int colorRange,
       @C.ColorTransfer int colorTransfer,
@@ -164,8 +150,6 @@ public final class AvcConfig {
     this.nalUnitLengthFieldLength = nalUnitLengthFieldLength;
     this.width = width;
     this.height = height;
-    this.bitdepthLuma = bitdepthLuma;
-    this.bitdepthChroma = bitdepthChroma;
     this.colorSpace = colorSpace;
     this.colorRange = colorRange;
     this.colorTransfer = colorTransfer;

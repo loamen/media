@@ -20,7 +20,6 @@ import static androidx.media3.common.util.Assertions.checkArgument;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 
 import android.net.Uri;
-import androidx.annotation.GuardedBy;
 import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -162,6 +161,7 @@ public final class RtspMediaSource extends BaseMediaSource {
     /** Does nothing. {@link RtspMediaSource} does not support error handling policies. */
     @Override
     public Factory setLoadErrorHandlingPolicy(LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
+      // TODO(internal b/172331505): Implement support.
       return this;
     }
 
@@ -213,6 +213,7 @@ public final class RtspMediaSource extends BaseMediaSource {
     }
   }
 
+  private final MediaItem mediaItem;
   private final RtpDataChannel.Factory rtpDataChannelFactory;
   private final String userAgent;
   private final Uri uri;
@@ -224,9 +225,6 @@ public final class RtspMediaSource extends BaseMediaSource {
   private boolean timelineIsLive;
   private boolean timelineIsPlaceholder;
 
-  @GuardedBy("this")
-  private MediaItem mediaItem;
-
   @VisibleForTesting
   /* package */ RtspMediaSource(
       MediaItem mediaItem,
@@ -237,7 +235,7 @@ public final class RtspMediaSource extends BaseMediaSource {
     this.mediaItem = mediaItem;
     this.rtpDataChannelFactory = rtpDataChannelFactory;
     this.userAgent = userAgent;
-    this.uri = checkNotNull(mediaItem.localConfiguration).uri;
+    this.uri = checkNotNull(this.mediaItem.localConfiguration).uri;
     this.socketFactory = socketFactory;
     this.debugLoggingEnabled = debugLoggingEnabled;
     this.timelineDurationUs = C.TIME_UNSET;
@@ -255,19 +253,8 @@ public final class RtspMediaSource extends BaseMediaSource {
   }
 
   @Override
-  public synchronized MediaItem getMediaItem() {
+  public MediaItem getMediaItem() {
     return mediaItem;
-  }
-
-  @Override
-  public boolean canUpdateMediaItem(MediaItem mediaItem) {
-    @Nullable MediaItem.LocalConfiguration newConfiguration = mediaItem.localConfiguration;
-    return newConfiguration != null && newConfiguration.uri.equals(this.uri);
-  }
-
-  @Override
-  public synchronized void updateMediaItem(MediaItem mediaItem) {
-    this.mediaItem = mediaItem;
   }
 
   @Override
@@ -317,7 +304,7 @@ public final class RtspMediaSource extends BaseMediaSource {
             /* isDynamic= */ false,
             /* useLiveConfiguration= */ timelineIsLive,
             /* manifest= */ null,
-            getMediaItem());
+            mediaItem);
     if (timelineIsPlaceholder) {
       timeline =
           new ForwardingTimeline(timeline) {

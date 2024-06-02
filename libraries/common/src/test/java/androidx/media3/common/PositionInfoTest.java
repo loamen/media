@@ -17,7 +17,6 @@ package androidx.media3.common;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import android.os.Bundle;
 import androidx.media3.common.Player.PositionInfo;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
@@ -32,7 +31,7 @@ public class PositionInfoTest {
     PositionInfo positionInfo =
         new PositionInfo(
             /* windowUid= */ null,
-            /* mediaItemIndex= */ 23,
+            /* windowIndex= */ 23,
             new MediaItem.Builder().setMediaId("1234").build(),
             /* periodUid= */ null,
             /* periodIndex= */ 11,
@@ -49,7 +48,7 @@ public class PositionInfoTest {
     PositionInfo positionInfo =
         new PositionInfo(
             /* windowUid= */ new Object(),
-            /* mediaItemIndex= */ 23,
+            /* windowIndex= */ 23,
             MediaItem.fromUri("https://exoplayer.dev"),
             /* periodUid= */ null,
             /* periodIndex= */ 11,
@@ -67,7 +66,7 @@ public class PositionInfoTest {
     PositionInfo positionInfo =
         new PositionInfo(
             /* windowUid= */ null,
-            /* mediaItemIndex= */ 23,
+            /* windowIndex= */ 23,
             MediaItem.fromUri("https://exoplayer.dev"),
             /* periodUid= */ new Object(),
             /* periodIndex= */ 11,
@@ -78,70 +77,5 @@ public class PositionInfoTest {
 
     PositionInfo positionInfoFromBundle = PositionInfo.CREATOR.fromBundle(positionInfo.toBundle());
     assertThat(positionInfoFromBundle.periodUid).isNull();
-  }
-
-  @Test
-  public void roundTripViaBundle_withDefaultValues_yieldsEqualInstance() {
-    PositionInfo defaultPositionInfo =
-        new PositionInfo(
-            /* windowUid= */ null,
-            /* mediaItemIndex= */ 0,
-            /* mediaItem= */ null,
-            /* periodUid= */ null,
-            /* periodIndex= */ 0,
-            /* positionMs= */ 0,
-            /* contentPositionMs= */ 0,
-            /* adGroupIndex= */ C.INDEX_UNSET,
-            /* adIndexInAdGroup= */ C.INDEX_UNSET);
-
-    PositionInfo roundTripValue = PositionInfo.CREATOR.fromBundle(defaultPositionInfo.toBundle());
-
-    assertThat(roundTripValue).isEqualTo(defaultPositionInfo);
-  }
-
-  @Test
-  public void toBundle_withDefaultValues_omitsAllData() {
-    PositionInfo defaultPositionInfo =
-        new PositionInfo(
-            /* windowUid= */ null,
-            /* mediaItemIndex= */ 0,
-            /* mediaItem= */ null,
-            /* periodUid= */ null,
-            /* periodIndex= */ 0,
-            /* positionMs= */ 0,
-            /* contentPositionMs= */ 0,
-            /* adGroupIndex= */ C.INDEX_UNSET,
-            /* adIndexInAdGroup= */ C.INDEX_UNSET);
-
-    Bundle bundle =
-        defaultPositionInfo.toBundle(/* controllerInterfaceVersion= */ Integer.MAX_VALUE);
-
-    assertThat(bundle.isEmpty()).isTrue();
-  }
-
-  @Test
-  public void toBundle_withDefaultValuesForControllerInterfaceBefore3_includesDefaultValues() {
-    // Controller before version 3 uses invalid default values for indices and the Bundle should
-    // always include them to avoid using the default values in the controller code.
-    PositionInfo defaultPositionInfo =
-        new PositionInfo(
-            /* windowUid= */ null,
-            /* mediaItemIndex= */ 0,
-            /* mediaItem= */ null,
-            /* periodUid= */ null,
-            /* periodIndex= */ 0,
-            /* positionMs= */ 0,
-            /* contentPositionMs= */ 0,
-            /* adGroupIndex= */ C.INDEX_UNSET,
-            /* adIndexInAdGroup= */ C.INDEX_UNSET);
-
-    Bundle bundle = defaultPositionInfo.toBundle(/* controllerInterfaceVersion= */ 2);
-
-    assertThat(bundle.keySet())
-        .containsAtLeast(
-            PositionInfo.FIELD_MEDIA_ITEM_INDEX,
-            PositionInfo.FIELD_CONTENT_POSITION_MS,
-            PositionInfo.FIELD_PERIOD_INDEX,
-            PositionInfo.FIELD_POSITION_MS);
   }
 }

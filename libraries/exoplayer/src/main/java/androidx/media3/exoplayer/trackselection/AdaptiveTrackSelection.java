@@ -26,7 +26,6 @@ import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
@@ -40,6 +39,7 @@ import com.google.common.collect.MultimapBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * A bandwidth based adaptive {@link ExoTrackSelection}, whose selected track is updated to be the
@@ -319,7 +319,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   private @C.SelectionReason int reason;
   private long lastBufferEvaluationMs;
   @Nullable private MediaChunk lastBufferEvaluationMediaChunk;
-  private long latestBitrateEstimate;
 
   /**
    * @param group The {@link TrackGroup}.
@@ -411,7 +410,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     playbackSpeed = 1f;
     reason = C.SELECTION_REASON_UNKNOWN;
     lastBufferEvaluationMs = C.TIME_UNSET;
-    latestBitrateEstimate = C.RATE_UNSET_INT;
   }
 
   @CallSuper
@@ -459,8 +457,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
       previousReason = Iterables.getLast(queue).trackSelectionReason;
     }
     int newSelectedIndex = determineIdealSelectedIndex(nowMs, chunkDurationUs);
-    if (newSelectedIndex != previousSelectedIndex
-        && !isTrackExcluded(previousSelectedIndex, nowMs)) {
+    if (!isTrackExcluded(previousSelectedIndex, nowMs)) {
       // Revert back to the previous selection if conditions are not suitable for switching.
       Format currentFormat = getFormat(previousSelectedIndex);
       Format selectedFormat = getFormat(newSelectedIndex);
@@ -543,11 +540,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
       }
     }
     return queueSize;
-  }
-
-  @Override
-  public long getLatestBitrateEstimate() {
-    return latestBitrateEstimate;
   }
 
   /**
@@ -688,8 +680,8 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   }
 
   private long getTotalAllocatableBandwidth(long chunkDurationUs) {
-    latestBitrateEstimate = bandwidthMeter.getBitrateEstimate();
-    long cautiousBandwidthEstimate = (long) (latestBitrateEstimate * bandwidthFraction);
+    long cautiousBandwidthEstimate =
+        (long) (bandwidthMeter.getBitrateEstimate() * bandwidthFraction);
     long timeToFirstByteEstimateUs = bandwidthMeter.getTimeToFirstByteEstimateUs();
     if (timeToFirstByteEstimateUs == C.TIME_UNSET || chunkDurationUs == C.TIME_UNSET) {
       return (long) (cautiousBandwidthEstimate / playbackSpeed);
@@ -833,7 +825,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
 
     /** Total bandwidth in bits per second at which this checkpoint applies. */
     public final long totalBandwidth;
-
     /** Allocated bandwidth at this checkpoint in bits per second. */
     public final long allocatedBandwidth;
 
