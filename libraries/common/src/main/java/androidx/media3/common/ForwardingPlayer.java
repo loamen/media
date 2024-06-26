@@ -20,7 +20,6 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
-import androidx.annotation.CallSuper;
 import androidx.annotation.Nullable;
 import androidx.media3.common.text.Cue;
 import androidx.media3.common.text.CueGroup;
@@ -51,13 +50,14 @@ public class ForwardingPlayer implements Player {
   /**
    * Calls {@link Player#addListener(Listener)} on the delegate.
    *
-   * <p>Overrides of this method must delegate to {@code super.addListener} and not {@code
-   * delegate.addListener}, in order to ensure the correct {@link Player} instance is passed to
-   * {@link Player.Listener#onEvents(Player, Events)} (i.e. this forwarding instance, and not the
+   * <p>Overrides of this method must <strong>not</strong> directly call {@code
+   * delegate.addListener}. If the override wants to pass the {@link Player.Listener} instance to
+   * the delegate {@link Player}, it must do so by calling {@code super.addListener} instead. This
+   * ensures the correct {@link Player} instance is passed to {@link
+   * Player.Listener#onEvents(Player, Events)} (i.e. this forwarding instance, and not the
    * underlying {@code delegate} instance).
    */
   @Override
-  @CallSuper
   public void addListener(Listener listener) {
     player.addListener(new ForwardingListener(this, listener));
   }
@@ -65,12 +65,11 @@ public class ForwardingPlayer implements Player {
   /**
    * Calls {@link Player#removeListener(Listener)} on the delegate.
    *
-   * <p>Overrides of this method must delegate to {@code super.removeListener} and not {@code
-   * delegate.removeListener}, in order to ensure the listener 'matches' the listener added via
-   * {@link #addListener} (otherwise the listener registered on the delegate won't be removed).
+   * <p>Overrides of this method must <strong>not</strong> directly call {@code
+   * delegate.removeListener}. If the override wants to pass the {@link Player.Listener} instance to
+   * the delegate {@link Player}, it must do so by calling {@code super.removeListener} instead.
    */
   @Override
-  @CallSuper
   public void removeListener(Listener listener) {
     player.removeListener(new ForwardingListener(this, listener));
   }
@@ -861,6 +860,7 @@ public class ForwardingPlayer implements Player {
   /**
    * @deprecated Use {@link #setDeviceVolume(int, int)} instead.
    */
+  @SuppressWarnings("deprecation") // Intentionally forwarding deprecated method
   @Deprecated
   @Override
   public void setDeviceVolume(int volume) {
@@ -876,6 +876,7 @@ public class ForwardingPlayer implements Player {
   /**
    * @deprecated Use {@link #increaseDeviceVolume(int)} instead.
    */
+  @SuppressWarnings("deprecation") // Intentionally forwarding deprecated method
   @Deprecated
   @Override
   public void increaseDeviceVolume() {
@@ -891,6 +892,7 @@ public class ForwardingPlayer implements Player {
   /**
    * @deprecated Use {@link #decreaseDeviceVolume(int)} instead.
    */
+  @SuppressWarnings("deprecation") // Intentionally forwarding deprecated method
   @Deprecated
   @Override
   public void decreaseDeviceVolume() {
@@ -906,6 +908,7 @@ public class ForwardingPlayer implements Player {
   /**
    * @deprecated Use {@link #setDeviceMuted(boolean, int)} instead.
    */
+  @SuppressWarnings("deprecation") // Intentionally forwarding deprecated method
   @Deprecated
   @Override
   public void setDeviceMuted(boolean muted) {
@@ -916,6 +919,12 @@ public class ForwardingPlayer implements Player {
   @Override
   public void setDeviceMuted(boolean muted, @C.VolumeFlags int flags) {
     player.setDeviceMuted(muted, flags);
+  }
+
+  /** Calls {@link Player#setAudioAttributes(AudioAttributes, boolean)} on the delegate. */
+  @Override
+  public void setAudioAttributes(AudioAttributes audioAttributes, boolean handleAudioFocus) {
+    player.setAudioAttributes(audioAttributes, handleAudioFocus);
   }
 
   /** Returns the {@link Player} to which operations are forwarded. */
@@ -1101,6 +1110,7 @@ public class ForwardingPlayer implements Player {
       listener.onSkipSilenceEnabledChanged(skipSilenceEnabled);
     }
 
+    @SuppressWarnings("deprecation") // Intentionally forwarding deprecated method
     @Override
     public void onCues(List<Cue> cues) {
       listener.onCues(cues);
