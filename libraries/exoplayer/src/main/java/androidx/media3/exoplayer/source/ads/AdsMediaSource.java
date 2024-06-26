@@ -19,6 +19,7 @@ import static androidx.media3.common.util.Assertions.checkNotNull;
 import static androidx.media3.common.util.Assertions.checkState;
 import static java.lang.annotation.ElementType.TYPE_USE;
 
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -330,16 +331,16 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
         AdPlaybackState.AdGroup adGroup = adPlaybackState.getAdGroup(adGroupIndex);
         if (adMediaSourceHolder != null
             && !adMediaSourceHolder.hasMediaSource()
-            && adIndexInAdGroup < adGroup.mediaItems.length) {
-          @Nullable MediaItem adMediaItem = adGroup.mediaItems[adIndexInAdGroup];
-          if (adMediaItem != null) {
+            && adIndexInAdGroup < adGroup.uris.length) {
+          @Nullable Uri adUri = adGroup.uris[adIndexInAdGroup];
+          if (adUri != null) {
+            MediaItem.Builder adMediaItem = new MediaItem.Builder().setUri(adUri);
             // Propagate the content's DRM config into the ad media source.
             if (contentDrmConfiguration != null) {
-              adMediaItem =
-                  adMediaItem.buildUpon().setDrmConfiguration(contentDrmConfiguration).build();
+              adMediaItem.setDrmConfiguration(contentDrmConfiguration);
             }
-            MediaSource adMediaSource = adMediaSourceFactory.createMediaSource(adMediaItem);
-            adMediaSourceHolder.initializeWithMediaSource(adMediaSource, adMediaItem);
+            MediaSource adMediaSource = adMediaSourceFactory.createMediaSource(adMediaItem.build());
+            adMediaSourceHolder.initializeWithMediaSource(adMediaSource, adUri);
           }
         }
       }
@@ -431,10 +432,10 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
 
   private final class AdPrepareListener implements MaskingMediaPeriod.PrepareListener {
 
-    private final MediaItem adMediaItem;
+    private final Uri adUri;
 
-    public AdPrepareListener(MediaItem adMediaItem) {
-      this.adMediaItem = adMediaItem;
+    public AdPrepareListener(Uri adUri) {
+      this.adUri = adUri;
     }
 
     @Override
@@ -453,7 +454,7 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
           .loadError(
               new LoadEventInfo(
                   LoadEventInfo.getNewId(),
-                  new DataSpec(checkNotNull(adMediaItem.localConfiguration).uri),
+                  new DataSpec(adUri),
                   /* elapsedRealtimeMs= */ SystemClock.elapsedRealtime()),
               C.DATA_TYPE_AD,
               AdLoadException.createForAd(exception),
@@ -473,7 +474,7 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
     private final MediaPeriodId id;
     private final List<MaskingMediaPeriod> activeMediaPeriods;
 
-    private @MonotonicNonNull MediaItem adMediaItem;
+    private @MonotonicNonNull Uri adUri;
     private @MonotonicNonNull MediaSource adMediaSource;
     private @MonotonicNonNull Timeline timeline;
 
@@ -482,13 +483,13 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
       activeMediaPeriods = new ArrayList<>();
     }
 
-    public void initializeWithMediaSource(MediaSource adMediaSource, MediaItem adMediaItem) {
+    public void initializeWithMediaSource(MediaSource adMediaSource, Uri adUri) {
       this.adMediaSource = adMediaSource;
-      this.adMediaItem = adMediaItem;
+      this.adUri = adUri;
       for (int i = 0; i < activeMediaPeriods.size(); i++) {
         MaskingMediaPeriod maskingMediaPeriod = activeMediaPeriods.get(i);
         maskingMediaPeriod.setMediaSource(adMediaSource);
-        maskingMediaPeriod.setPrepareListener(new AdPrepareListener(adMediaItem));
+        maskingMediaPeriod.setPrepareListener(new AdPrepareListener(adUri));
       }
       prepareChildSource(id, adMediaSource);
     }
@@ -500,7 +501,7 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
       activeMediaPeriods.add(maskingMediaPeriod);
       if (adMediaSource != null) {
         maskingMediaPeriod.setMediaSource(adMediaSource);
-        maskingMediaPeriod.setPrepareListener(new AdPrepareListener(checkNotNull(adMediaItem)));
+        maskingMediaPeriod.setPrepareListener(new AdPrepareListener(checkNotNull(adUri)));
       }
       if (timeline != null) {
         Object periodUid = timeline.getUidOfPeriod(/* periodIndex= */ 0);

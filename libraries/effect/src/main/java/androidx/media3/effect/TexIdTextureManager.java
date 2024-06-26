@@ -18,41 +18,49 @@ package androidx.media3.effect;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 
 import android.opengl.GLES10;
+import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.FrameInfo;
 import androidx.media3.common.GlObjectsProvider;
 import androidx.media3.common.GlTextureInfo;
 import androidx.media3.common.OnInputFrameProcessedListener;
+import androidx.media3.common.VideoFrameProcessingException;
 import androidx.media3.common.util.GlUtil;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * Forwards frames made available via {@linkplain GLES10#GL_TEXTURE_2D traditional GLES textures} to
  * a {@link GlShaderProgram} for consumption.
+ *
+ * <p>Public methods in this class can be called from any thread.
  */
-/* package */ final class TexIdTextureManager extends TextureManager {
-  private @MonotonicNonNull FrameConsumptionManager frameConsumptionManager;
+/* package */ final class TexIdTextureManager implements TextureManager {
+  private final VideoFrameProcessingTaskExecutor videoFrameProcessingTaskExecutor;
+  private final FrameConsumptionManager frameConsumptionManager;
 
   private @MonotonicNonNull OnInputFrameProcessedListener frameProcessedListener;
   private @MonotonicNonNull FrameInfo inputFrameInfo;
-  private final GlObjectsProvider glObjectsProvider;
 
   /**
    * Creates a new instance.
    *
    * @param glObjectsProvider The {@link GlObjectsProvider} for using EGL and GLES.
+   * @param shaderProgram The {@link GlShaderProgram} for which this {@code texIdTextureManager}
+   *     will be set as the {@link GlShaderProgram.InputListener}.
    * @param videoFrameProcessingTaskExecutor The {@link VideoFrameProcessingTaskExecutor}.
    */
   public TexIdTextureManager(
       GlObjectsProvider glObjectsProvider,
+      GlShaderProgram shaderProgram,
       VideoFrameProcessingTaskExecutor videoFrameProcessingTaskExecutor) {
-    super(videoFrameProcessingTaskExecutor);
-    this.glObjectsProvider = glObjectsProvider;
+    this.videoFrameProcessingTaskExecutor = videoFrameProcessingTaskExecutor;
+    frameConsumptionManager =
+        new FrameConsumptionManager(
+            glObjectsProvider, shaderProgram, videoFrameProcessingTaskExecutor);
   }
 
   @Override
   public void onReadyToAcceptInputFrame() {
-    checkNotNull(frameConsumptionManager);
     videoFrameProcessingTaskExecutor.submit(frameConsumptionManager::onReadyToAcceptInputFrame);
   }
 
@@ -65,10 +73,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Override
-  public void setSamplingGlShaderProgram(GlShaderProgram samplingGlShaderProgram) {
-    frameConsumptionManager =
-        new FrameConsumptionManager(
-            glObjectsProvider, samplingGlShaderProgram, videoFrameProcessingTaskExecutor);
+  public void onFlush() {
+    videoFrameProcessingTaskExecutor.submit(frameConsumptionManager::onFlush);
   }
 
   @Override
@@ -84,13 +90,11 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
                   /* rboId= */ C.INDEX_UNSET,
                   frameInfo.width,
                   frameInfo.height);
-          checkNotNull(frameConsumptionManager).queueInputFrame(inputTexture, presentationTimeUs);
+          frameConsumptionManager.queueInputFrame(inputTexture, presentationTimeUs);
           DebugTraceUtil.logEvent(
               DebugTraceUtil.EVENT_VFP_QUEUE_TEXTURE,
               presentationTimeUs,
-              /* extraFormat= */ "%dx%d",
-              /* extraArgs...= */ frameInfo.width,
-              frameInfo.height);
+              /* extra= */ frameInfo.width + "x" + frameInfo.height);
         });
   }
 
@@ -106,29 +110,26 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public int getPendingFrameCount() {
-    return checkNotNull(frameConsumptionManager).getPendingFrameCount();
+    return frameConsumptionManager.getPendingFrameCount();
   }
 
   @Override
   public void signalEndOfCurrentInputStream() {
     videoFrameProcessingTaskExecutor.submit(
         () -> {
-          checkNotNull(frameConsumptionManager).signalEndOfCurrentStream();
+          frameConsumptionManager.signalEndOfCurrentStream();
           DebugTraceUtil.logEvent(
               DebugTraceUtil.EVENT_TEX_ID_TEXTURE_MANAGER_SIGNAL_EOS, C.TIME_END_OF_SOURCE);
         });
   }
 
   @Override
-  public void release() {
+  public void setOnFlushCompleteListener(@Nullable VideoFrameProcessingTaskExecutor.Task task) {
     // Do nothing.
   }
 
-  // Methods that must be called on the GL thread.
-
   @Override
-  protected synchronized void flush() {
-    checkNotNull(frameConsumptionManager).onFlush();
-    super.flush();
+  public void release() throws VideoFrameProcessingException {
+    // Do nothing.
   }
 }

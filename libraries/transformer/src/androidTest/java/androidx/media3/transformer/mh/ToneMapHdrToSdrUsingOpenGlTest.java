@@ -21,12 +21,19 @@ import static androidx.media3.transformer.AndroidTestUtil.MP4_ASSET_720P_4_SECON
 import static androidx.media3.transformer.AndroidTestUtil.MP4_ASSET_720P_4_SECOND_HDR10_FORMAT;
 import static androidx.media3.transformer.AndroidTestUtil.MP4_ASSET_DOLBY_VISION_HDR;
 import static androidx.media3.transformer.AndroidTestUtil.MP4_ASSET_DOLBY_VISION_HDR_FORMAT;
+import static androidx.media3.transformer.AndroidTestUtil.recordTestSkipped;
 import static androidx.media3.transformer.mh.FileUtil.assertFileHasColorTransfer;
-import static androidx.media3.transformer.mh.HdrCapabilitiesUtil.skipAndLogIfOpenGlToneMappingUnsupported;
+import static androidx.test.core.app.ApplicationProvider.getApplicationContext;
 
 import android.content.Context;
 import androidx.media3.common.C;
+import androidx.media3.common.ColorInfo;
+import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.util.GlUtil;
+import androidx.media3.common.util.Util;
+import androidx.media3.exoplayer.mediacodec.MediaCodecUtil;
+import androidx.media3.transformer.AndroidTestUtil;
 import androidx.media3.transformer.Composition;
 import androidx.media3.transformer.EditedMediaItem;
 import androidx.media3.transformer.EditedMediaItemSequence;
@@ -35,6 +42,8 @@ import androidx.media3.transformer.Transformer;
 import androidx.media3.transformer.TransformerAndroidTestRunner;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.io.IOException;
+import org.json.JSONException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -50,7 +59,7 @@ public class ToneMapHdrToSdrUsingOpenGlTest {
   @Test
   public void export_toneMap_hlg10File_toneMaps() throws Exception {
     String testId = "export_glToneMap_hlg10File_toneMaps";
-    if (skipAndLogIfOpenGlToneMappingUnsupported(
+    if (!deviceSupportsOpenGlToneMapping(
         testId, /* inputFormat= */ MP4_ASSET_1080P_5_SECOND_HLG10_FORMAT)) {
       return;
     }
@@ -61,7 +70,7 @@ public class ToneMapHdrToSdrUsingOpenGlTest {
   @Test
   public void export_toneMap_hdr10File_toneMaps() throws Exception {
     String testId = "export_glToneMap_hdr10File_toneMaps";
-    if (skipAndLogIfOpenGlToneMappingUnsupported(
+    if (!deviceSupportsOpenGlToneMapping(
         testId, /* inputFormat= */ MP4_ASSET_720P_4_SECOND_HDR10_FORMAT)) {
       return;
     }
@@ -72,7 +81,7 @@ public class ToneMapHdrToSdrUsingOpenGlTest {
   @Test
   public void export_toneMap_dolbyVisionFile_toneMaps() throws Exception {
     String testId = "export_toneMap_dolbyVisionFile_toneMaps";
-    if (skipAndLogIfOpenGlToneMappingUnsupported(
+    if (!deviceSupportsOpenGlToneMapping(
         testId, /* inputFormat= */ MP4_ASSET_DOLBY_VISION_HDR_FORMAT)) {
       return;
     }
@@ -93,5 +102,31 @@ public class ToneMapHdrToSdrUsingOpenGlTest {
             .build()
             .run(testId, composition);
     assertFileHasColorTransfer(context, exportTestResult.filePath, C.COLOR_TRANSFER_SDR);
+  }
+
+  private static boolean deviceSupportsOpenGlToneMapping(String testId, Format inputFormat)
+      throws JSONException, IOException, MediaCodecUtil.DecoderQueryException {
+    Context context = getApplicationContext();
+    if (Util.SDK_INT < 29) {
+      recordTestSkipped(
+          context,
+          testId,
+          /* reason= */ "OpenGL-based HDR to SDR tone mapping is only supported on API 29+.");
+      return false;
+    }
+
+    if (!GlUtil.isYuvTargetExtensionSupported()) {
+      recordTestSkipped(context, testId, /* reason= */ "Device lacks YUV extension support.");
+      return false;
+    }
+
+    return !AndroidTestUtil.skipAndLogIfFormatsUnsupported(
+        context,
+        testId,
+        inputFormat,
+        /* outputFormat= */ inputFormat
+            .buildUpon()
+            .setColorInfo(ColorInfo.SDR_BT709_LIMITED)
+            .build());
   }
 }

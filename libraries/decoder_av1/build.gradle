@@ -17,7 +17,6 @@ android {
     namespace 'androidx.media3.decoder.av1'
 
     defaultConfig {
-        minSdkVersion 16
         externalNativeBuild {
             cmake {
                 // Debug CMake build type causes video frames to drop,

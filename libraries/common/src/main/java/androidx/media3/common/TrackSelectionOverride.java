@@ -114,22 +114,13 @@ public final class TrackSelectionOverride implements Bundleable {
     return bundle;
   }
 
-  /**
-   * Object that can restore {@code TrackSelectionOverride} from a {@link Bundle}.
-   *
-   * @deprecated Use {@link #fromBundle} instead.
-   */
+  /** Object that can restore {@code TrackSelectionOverride} from a {@link Bundle}. */
   @UnstableApi
-  @Deprecated
-  @SuppressWarnings("deprecation") // Deprecated instance of deprecated class
-  public static final Creator<TrackSelectionOverride> CREATOR = TrackSelectionOverride::fromBundle;
-
-  /** Restores a {@code TrackSelectionOverride} from a {@link Bundle}. */
-  @UnstableApi
-  public static TrackSelectionOverride fromBundle(Bundle bundle) {
-    Bundle trackGroupBundle = checkNotNull(bundle.getBundle(FIELD_TRACK_GROUP));
-    TrackGroup mediaTrackGroup = TrackGroup.fromBundle(trackGroupBundle);
-    int[] tracks = checkNotNull(bundle.getIntArray(FIELD_TRACKS));
-    return new TrackSelectionOverride(mediaTrackGroup, Ints.asList(tracks));
-  }
+  public static final Creator<TrackSelectionOverride> CREATOR =
+      bundle -> {
+        Bundle trackGroupBundle = checkNotNull(bundle.getBundle(FIELD_TRACK_GROUP));
+        TrackGroup mediaTrackGroup = TrackGroup.CREATOR.fromBundle(trackGroupBundle);
+        int[] tracks = checkNotNull(bundle.getIntArray(FIELD_TRACKS));
+        return new TrackSelectionOverride(mediaTrackGroup, Ints.asList(tracks));
+      };
 }

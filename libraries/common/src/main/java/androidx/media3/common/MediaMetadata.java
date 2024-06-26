@@ -462,12 +462,7 @@ public final class MediaMetadata implements Bundleable {
       return this;
     }
 
-    /**
-     * Populates all the fields from {@code mediaMetadata}.
-     *
-     * <p>Fields are populated when they are non-null with an exception that both {@code artworkUri}
-     * and {@code artworkData} are populated, when at least one of them is non-null.
-     */
+    /** Populates all the fields from {@code mediaMetadata}, provided they are non-null. */
     @SuppressWarnings("deprecation") // Populating deprecated fields.
     @CanIgnoreReturnValue
     @UnstableApi
@@ -502,9 +497,11 @@ public final class MediaMetadata implements Bundleable {
       if (mediaMetadata.overallRating != null) {
         setOverallRating(mediaMetadata.overallRating);
       }
-      if (mediaMetadata.artworkUri != null || mediaMetadata.artworkData != null) {
-        setArtworkUri(mediaMetadata.artworkUri);
+      if (mediaMetadata.artworkData != null) {
         setArtworkData(mediaMetadata.artworkData, mediaMetadata.artworkDataType);
+      }
+      if (mediaMetadata.artworkUri != null) {
+        setArtworkUri(mediaMetadata.artworkUri);
       }
       if (mediaMetadata.trackNumber != null) {
         setTrackNumber(mediaMetadata.trackNumber);
@@ -1085,9 +1082,8 @@ public final class MediaMetadata implements Bundleable {
   /**
    * Optional extras {@link Bundle}.
    *
-   * <p>Given the complexities of checking the equality of two {@link Bundle} instances, the
-   * contents of these extras are not considered in the {@link #equals(Object)} and {@link
-   * #hashCode()} implementation.
+   * <p>Given the complexities of checking the equality of two {@link Bundle}s, this is not
+   * considered in the {@link #equals(Object)} or {@link #hashCode()}.
    */
   @Nullable public final Bundle extras;
 
@@ -1192,8 +1188,7 @@ public final class MediaMetadata implements Bundleable {
         && Util.areEqual(genre, that.genre)
         && Util.areEqual(compilation, that.compilation)
         && Util.areEqual(station, that.station)
-        && Util.areEqual(mediaType, that.mediaType)
-        && ((extras == null) == (that.extras == null));
+        && Util.areEqual(mediaType, that.mediaType);
   }
 
   @SuppressWarnings("deprecation") // Hashing deprecated fields.
@@ -1231,8 +1226,7 @@ public final class MediaMetadata implements Bundleable {
         genre,
         compilation,
         station,
-        mediaType,
-        extras == null);
+        mediaType);
   }
 
   // Bundleable implementation.
@@ -1379,20 +1373,11 @@ public final class MediaMetadata implements Bundleable {
     return bundle;
   }
 
-  /**
-   * Object that can restore {@link MediaMetadata} from a {@link Bundle}.
-   *
-   * @deprecated Use {@link #fromBundle} instead.
-   */
-  @UnstableApi
-  @Deprecated
-  @SuppressWarnings("deprecation") // Deprecated instance of deprecated class
-  public static final Creator<MediaMetadata> CREATOR = MediaMetadata::fromBundle;
+  /** Object that can restore {@link MediaMetadata} from a {@link Bundle}. */
+  @UnstableApi public static final Creator<MediaMetadata> CREATOR = MediaMetadata::fromBundle;
 
-  /** Restores a {@code MediaMetadata} from a {@link Bundle}. */
-  @UnstableApi
   @SuppressWarnings("deprecation") // Unbundling deprecated fields.
-  public static MediaMetadata fromBundle(Bundle bundle) {
+  private static MediaMetadata fromBundle(Bundle bundle) {
     Builder builder = new Builder();
     builder
         .setTitle(bundle.getCharSequence(FIELD_TITLE))
@@ -1419,13 +1404,13 @@ public final class MediaMetadata implements Bundleable {
     if (bundle.containsKey(FIELD_USER_RATING)) {
       @Nullable Bundle fieldBundle = bundle.getBundle(FIELD_USER_RATING);
       if (fieldBundle != null) {
-        builder.setUserRating(Rating.fromBundle(fieldBundle));
+        builder.setUserRating(Rating.CREATOR.fromBundle(fieldBundle));
       }
     }
     if (bundle.containsKey(FIELD_OVERALL_RATING)) {
       @Nullable Bundle fieldBundle = bundle.getBundle(FIELD_OVERALL_RATING);
       if (fieldBundle != null) {
-        builder.setOverallRating(Rating.fromBundle(fieldBundle));
+        builder.setOverallRating(Rating.CREATOR.fromBundle(fieldBundle));
       }
     }
     if (bundle.containsKey(FIELD_TRACK_NUMBER)) {

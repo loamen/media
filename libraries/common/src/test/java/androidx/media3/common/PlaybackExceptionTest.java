@@ -35,7 +35,7 @@ public class PlaybackExceptionTest {
             /* message= */ "test",
             /* cause= */ new IOException(/* message= */ "io"),
             PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND);
-    PlaybackException after = PlaybackException.fromBundle(before.toBundle());
+    PlaybackException after = PlaybackException.CREATOR.fromBundle(before.toBundle());
     assertPlaybackExceptionsAreEquivalent(before, after);
   }
 
@@ -60,7 +60,8 @@ public class PlaybackExceptionTest {
     bundle.putString("3", expectedCause.getClass().getName());
     bundle.putString("4", "cause message");
 
-    assertPlaybackExceptionsAreEquivalent(expectedException, PlaybackException.fromBundle(bundle));
+    assertPlaybackExceptionsAreEquivalent(
+        expectedException, PlaybackException.CREATOR.fromBundle(bundle));
   }
 
   @Test
@@ -98,7 +99,8 @@ public class PlaybackExceptionTest {
     bundle.putString("3", "invalid cause class name");
     bundle.putString("4", "cause message");
 
-    assertPlaybackExceptionsAreEquivalent(expectedException, PlaybackException.fromBundle(bundle));
+    assertPlaybackExceptionsAreEquivalent(
+        expectedException, PlaybackException.CREATOR.fromBundle(bundle));
   }
 
   // Internal methods.

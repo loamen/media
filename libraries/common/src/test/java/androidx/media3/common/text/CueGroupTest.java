@@ -45,7 +45,7 @@ public class CueGroupTest {
       parcel.setDataPosition(0);
 
       Bundle bundle = parcel.readBundle();
-      CueGroup filteredCueGroup = CueGroup.fromBundle(bundle);
+      CueGroup filteredCueGroup = CueGroup.CREATOR.fromBundle(bundle);
 
       assertThat(filteredCueGroup.cues).containsExactly(textCue);
     } finally {

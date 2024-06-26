@@ -429,7 +429,8 @@ public class PlayerActivity extends AppCompatActivity
     Bundle adsLoaderStateBundle = savedInstanceState.getBundle(KEY_SERVER_SIDE_ADS_LOADER_STATE);
     if (adsLoaderStateBundle != null) {
       serverSideAdsLoaderState =
-          ImaServerSideAdInsertionMediaSource.AdsLoader.State.fromBundle(adsLoaderStateBundle);
+          ImaServerSideAdInsertionMediaSource.AdsLoader.State.CREATOR.fromBundle(
+              adsLoaderStateBundle);
     }
   }
 

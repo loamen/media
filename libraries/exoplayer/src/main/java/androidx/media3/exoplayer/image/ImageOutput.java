@@ -23,24 +23,8 @@ import androidx.media3.common.util.UnstableApi;
 @UnstableApi
 public interface ImageOutput {
 
-  /** A no-op implementation of ImageOutput. */
-  ImageOutput NO_OP =
-      new ImageOutput() {
-        @Override
-        public void onImageAvailable(long presentationTimeUs, Bitmap bitmap) {
-          // Do nothing.
-        }
-
-        @Override
-        public void onDisabled() {
-          // Do nothing.
-        }
-      };
-
   /**
-   * Called on the playback thread when a new image is available.
-   *
-   * <p>This method should have an implementation that runs fast.
+   * Called when an there is a new image available.
    *
    * @param presentationTimeUs The presentation time of the image, in microseconds. This time is an
    *     offset from the start of the current {@link Timeline.Period}.
@@ -48,10 +32,6 @@ public interface ImageOutput {
    */
   void onImageAvailable(long presentationTimeUs, Bitmap bitmap);
 
-  /**
-   * Called on the playback thread when the renderer is disabled.
-   *
-   * <p>This method should have an implementation that runs fast.
-   */
+  /** Called when the renderer is disabled. */
   void onDisabled();
 }

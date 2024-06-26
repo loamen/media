@@ -16,9 +16,7 @@
 package androidx.media3.transformer;
 
 import static androidx.media3.common.util.Assertions.checkArgument;
-import static java.lang.annotation.ElementType.TYPE_USE;
 
-import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.ColorInfo;
@@ -26,11 +24,6 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.util.UnstableApi;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.util.List;
 import java.util.Objects;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -39,7 +32,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 public final class ExportResult {
   /** A builder for {@link ExportResult} instances. */
   public static final class Builder {
-    private ImmutableList.Builder<ProcessedInput> processedInputsBuilder;
+    private ImmutableList<ProcessedInput> processedInputs;
     private long durationMs;
     private long fileSizeBytes;
     private int averageAudioBitrate;
@@ -47,24 +40,30 @@ public final class ExportResult {
     private int sampleRate;
     @Nullable private String audioEncoderName;
     private int averageVideoBitrate;
-    @Nullable private ColorInfo colorInfo;
+    @Nullable ColorInfo colorInfo;
     private int height;
     private int width;
     private int videoFrameCount;
     @Nullable private String videoEncoderName;
-    private @OptimizationResult int optimizationResult;
     @Nullable private ExportException exportException;
 
     /** Creates a builder. */
-    @SuppressWarnings({"initialization.fields.uninitialized", "nullness:method.invocation"})
     public Builder() {
-      reset();
+      processedInputs = ImmutableList.of();
+      durationMs = C.TIME_UNSET;
+      fileSizeBytes = C.LENGTH_UNSET;
+      averageAudioBitrate = C.RATE_UNSET_INT;
+      channelCount = C.LENGTH_UNSET;
+      sampleRate = C.RATE_UNSET_INT;
+      averageVideoBitrate = C.RATE_UNSET_INT;
+      height = C.LENGTH_UNSET;
+      width = C.LENGTH_UNSET;
     }
 
-    /** Adds {@linkplain ProcessedInput processed inputs} to the {@link ProcessedInput} list. */
+    /** Sets the {@linkplain ProcessedInput processed inputs}. */
     @CanIgnoreReturnValue
-    public Builder addProcessedInputs(List<ProcessedInput> processedInputs) {
-      this.processedInputsBuilder.addAll(processedInputs);
+    public Builder setProcessedInputs(ImmutableList<ProcessedInput> processedInputs) {
+      this.processedInputs = processedInputs;
       return this;
     }
 
@@ -199,21 +198,6 @@ public final class ExportResult {
       return this;
     }
 
-    /**
-     * Sets {@link OptimizationResult} to indicate an optimization as been successful, or has failed
-     * and normal export proceeded instead.
-     *
-     * <p>The default value is {@link #OPTIMIZATION_NONE}.
-     *
-     * @param optimizationResult The {@link OptimizationResult}.
-     * @return This {@link Builder}.
-     */
-    @CanIgnoreReturnValue
-    public Builder setOptimizationResult(@OptimizationResult int optimizationResult) {
-      this.optimizationResult = optimizationResult;
-      return this;
-    }
-
     /** Sets the {@link ExportException} that caused the export to fail. */
     @CanIgnoreReturnValue
     public Builder setExportException(@Nullable ExportException exportException) {
@@ -224,7 +208,7 @@ public final class ExportResult {
     /** Builds an {@link ExportResult} instance. */
     public ExportResult build() {
       return new ExportResult(
-          processedInputsBuilder.build(),
+          processedInputs,
           durationMs,
           fileSizeBytes,
           averageAudioBitrate,
@@ -237,27 +221,7 @@ public final class ExportResult {
           width,
           videoFrameCount,
           videoEncoderName,
-          optimizationResult,
           exportException);
-    }
-
-    /** Resets all the fields to their default values. */
-    public void reset() {
-      processedInputsBuilder = new ImmutableList.Builder<>();
-      durationMs = C.TIME_UNSET;
-      fileSizeBytes = C.LENGTH_UNSET;
-      averageAudioBitrate = C.RATE_UNSET_INT;
-      channelCount = C.LENGTH_UNSET;
-      sampleRate = C.RATE_UNSET_INT;
-      audioEncoderName = null;
-      averageVideoBitrate = C.RATE_UNSET_INT;
-      colorInfo = null;
-      height = C.LENGTH_UNSET;
-      width = C.LENGTH_UNSET;
-      videoFrameCount = 0;
-      videoEncoderName = null;
-      optimizationResult = OPTIMIZATION_NONE;
-      exportException = null;
     }
   }
 
@@ -286,78 +250,6 @@ public final class ExportResult {
       this.videoDecoderName = videoDecoderName;
     }
   }
-
-  /**
-   * Specifies the result of an optimized operation, such as {@link
-   * Transformer.Builder#experimentalSetTrimOptimizationEnabled}. One of:
-   *
-   * <ul>
-   *   <li>{@link #OPTIMIZATION_NONE}
-   *   <li>{@link #OPTIMIZATION_SUCCEEDED}
-   *   <li>{@link #OPTIMIZATION_ABANDONED_KEYFRAME_PLACEMENT_OPTIMAL_FOR_TRIM}
-   *   <li>{@link #OPTIMIZATION_ABANDONED_TRIM_AND_TRANSCODING_TRANSFORMATION_REQUESTED}
-   *   <li>{@link #OPTIMIZATION_ABANDONED_OTHER}
-   *   <li>{@link #OPTIMIZATION_FAILED_EXTRACTION_FAILED}
-   *   <li>{@link #OPTIMIZATION_FAILED_FORMAT_MISMATCH}
-   * </ul>
-   */
-  @Documented
-  @Retention(RetentionPolicy.SOURCE)
-  @Target(TYPE_USE)
-  @IntDef({
-    OPTIMIZATION_NONE,
-    OPTIMIZATION_SUCCEEDED,
-    OPTIMIZATION_ABANDONED_KEYFRAME_PLACEMENT_OPTIMAL_FOR_TRIM,
-    OPTIMIZATION_ABANDONED_TRIM_AND_TRANSCODING_TRANSFORMATION_REQUESTED,
-    OPTIMIZATION_ABANDONED_OTHER,
-    OPTIMIZATION_FAILED_EXTRACTION_FAILED,
-    OPTIMIZATION_FAILED_FORMAT_MISMATCH
-  })
-  @interface OptimizationResult {}
-
-  /** No optimizations were applied since none were requested. */
-  public static final int OPTIMIZATION_NONE = 0;
-
-  /** The optimization was successfully applied. */
-  public static final int OPTIMIZATION_SUCCEEDED = 1;
-
-  /**
-   * {@linkplain Transformer.Builder#experimentalSetTrimOptimizationEnabled Trim optimization was
-   * requested}, but it would not improve performance because of key frame placement. The
-   * optimization was abandoned and normal export proceeded.
-   *
-   * <p>The trim optimization does not improve performance when the requested {@link
-   * androidx.media3.common.MediaItem.ClippingConfiguration#startPositionUs} is at a key frame, or
-   * when there are no key frames between the requested {@link
-   * androidx.media3.common.MediaItem.ClippingConfiguration#startPositionUs} and {@link
-   * androidx.media3.common.MediaItem.ClippingConfiguration#endPositionUs}
-   */
-  public static final int OPTIMIZATION_ABANDONED_KEYFRAME_PLACEMENT_OPTIMAL_FOR_TRIM = 2;
-
-  /**
-   * {@linkplain Transformer.Builder#experimentalSetTrimOptimizationEnabled Trim optimization was
-   * requested}, but it would not improve performance because another transformation that requires
-   * transcoding was also requested. The optimization was abandoned and normal export proceeded.
-   */
-  public static final int OPTIMIZATION_ABANDONED_TRIM_AND_TRANSCODING_TRANSFORMATION_REQUESTED = 3;
-
-  /**
-   * The requested optimization would not improve performance for a reason other than the ones
-   * specified above, so it was abandoned. Normal export proceeded.
-   */
-  public static final int OPTIMIZATION_ABANDONED_OTHER = 4;
-
-  /**
-   * The optimization failed because mp4 metadata extraction failed (possibly because the file
-   * wasn't an mp4 file). Normal export proceeded.
-   */
-  public static final int OPTIMIZATION_FAILED_EXTRACTION_FAILED = 5;
-
-  /**
-   * The optimization failed because the format between the two parts of the media to be put
-   * together did not match. Normal export proceeded.
-   */
-  public static final int OPTIMIZATION_FAILED_FORMAT_MISMATCH = 6;
 
   /** The list of {@linkplain ProcessedInput processed inputs}. */
   public final ImmutableList<ProcessedInput> processedInputs;
@@ -402,9 +294,6 @@ public final class ExportResult {
   /** The name of the video encoder used, or {@code null} if none were used. */
   @Nullable public final String videoEncoderName;
 
-  /** The result of any requested optimizations. */
-  public final @OptimizationResult int optimizationResult;
-
   /**
    * The {@link ExportException} that caused the export to fail, or {@code null} if the export was a
    * success.
@@ -425,7 +314,6 @@ public final class ExportResult {
       int width,
       int videoFrameCount,
       @Nullable String videoEncoderName,
-      @OptimizationResult int optimizationResult,
       @Nullable ExportException exportException) {
     this.processedInputs = processedInputs;
     this.durationMs = durationMs;
@@ -440,13 +328,12 @@ public final class ExportResult {
     this.width = width;
     this.videoFrameCount = videoFrameCount;
     this.videoEncoderName = videoEncoderName;
-    this.optimizationResult = optimizationResult;
     this.exportException = exportException;
   }
 
   public Builder buildUpon() {
     return new Builder()
-        .addProcessedInputs(processedInputs)
+        .setProcessedInputs(processedInputs)
         .setDurationMs(durationMs)
         .setFileSizeBytes(fileSizeBytes)
         .setAverageAudioBitrate(averageAudioBitrate)
@@ -459,7 +346,6 @@ public final class ExportResult {
         .setWidth(width)
         .setVideoFrameCount(videoFrameCount)
         .setVideoEncoderName(videoEncoderName)
-        .setOptimizationResult(optimizationResult)
         .setExportException(exportException);
   }
 
@@ -485,7 +371,6 @@ public final class ExportResult {
         && width == result.width
         && videoFrameCount == result.videoFrameCount
         && Objects.equals(videoEncoderName, result.videoEncoderName)
-        && optimizationResult == result.optimizationResult
         && Objects.equals(exportException, result.exportException);
   }
 
@@ -504,7 +389,6 @@ public final class ExportResult {
     result = 31 * result + width;
     result = 31 * result + videoFrameCount;
     result = 31 * result + Objects.hashCode(videoEncoderName);
-    result = 31 * result + optimizationResult;
     result = 31 * result + Objects.hashCode(exportException);
     return result;
   }

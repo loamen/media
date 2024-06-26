@@ -16,6 +16,7 @@
 
 package androidx.media3.transformer;
 
+import androidx.media3.common.C;
 import androidx.media3.common.audio.AudioProcessor.AudioFormat;
 import androidx.media3.common.util.Util;
 import java.nio.ByteBuffer;
@@ -48,11 +49,14 @@ import java.util.concurrent.atomic.AtomicLong;
    * @param durationUs The duration of the additional silence to generate, in microseconds.
    */
   public void addSilence(long durationUs) {
-    long outputFrameCount = Util.durationUsToSampleCount(durationUs, audioFormat.sampleRate);
-    // If the durationUs maps to a non-integer number of samples, then an extra sample is output.
-    // In the worst case, this is one sample (~22us of audio) per media item.
+    // The number of frames is not a timestamp, however this utility method provides
+    // overflow-safe multiplication & division.
+    long outputFrameCount =
+        Util.scaleLargeTimestamp(
+            /* timestamp= */ durationUs,
+            /* multiplier= */ audioFormat.sampleRate,
+            /* divisor= */ C.MICROS_PER_SECOND);
 
-    // TODO(b/260618558): Track leftover duration when generating in mixer.
     remainingBytesToOutput.addAndGet(audioFormat.bytesPerFrame * outputFrameCount);
   }
 

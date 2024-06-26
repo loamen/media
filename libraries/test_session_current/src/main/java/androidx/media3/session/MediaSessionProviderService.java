@@ -244,7 +244,8 @@ public class MediaSessionProviderService extends Service {
         case TEST_IS_SESSION_COMMAND_AVAILABLE:
           {
             SessionCommands availableSessionCommands =
-                SessionCommands.fromBundle(tokenExtras.getBundle(KEY_AVAILABLE_SESSION_COMMANDS));
+                SessionCommands.CREATOR.fromBundle(
+                    tokenExtras.getBundle(KEY_AVAILABLE_SESSION_COMMANDS));
             builder.setCallback(
                 new MediaSession.Callback() {
                   @Override
@@ -328,8 +329,7 @@ public class MediaSessionProviderService extends Service {
             session.setSessionPositionUpdateDelayMs(0L);
             if (useFakeMediaNotificationManagerController) {
               Bundle connectionHints = new Bundle();
-              connectionHints.putBoolean(
-                  MediaController.KEY_MEDIA_NOTIFICATION_CONTROLLER_FLAG, true);
+              connectionHints.putBoolean("androidx.media3.session.MediaNotificationManager", true);
               //noinspection unused
               ListenableFuture<MediaController> unusedFuture =
                   new MediaController.Builder(getApplicationContext(), session.getToken())
@@ -393,7 +393,7 @@ public class MediaSessionProviderService extends Service {
       MockPlayer player = new MockPlayer.Builder().build();
       @Nullable Bundle playerErrorBundle = config.getBundle(KEY_PLAYER_ERROR);
       if (playerErrorBundle != null) {
-        player.playerError = PlaybackException.fromBundle(playerErrorBundle);
+        player.playerError = PlaybackException.CREATOR.fromBundle(playerErrorBundle);
       }
       player.currentPosition = config.getLong(KEY_CURRENT_POSITION, player.currentPosition);
       player.bufferedPosition = config.getLong(KEY_BUFFERED_POSITION, player.bufferedPosition);
@@ -413,11 +413,11 @@ public class MediaSessionProviderService extends Service {
           config.getInt(KEY_CURRENT_AD_INDEX_IN_AD_GROUP, player.currentAdIndexInAdGroup);
       @Nullable Bundle playbackParametersBundle = config.getBundle(KEY_PLAYBACK_PARAMETERS);
       if (playbackParametersBundle != null) {
-        player.playbackParameters = PlaybackParameters.fromBundle(playbackParametersBundle);
+        player.playbackParameters = PlaybackParameters.CREATOR.fromBundle(playbackParametersBundle);
       }
       @Nullable Bundle timelineBundle = config.getBundle(KEY_TIMELINE);
       if (timelineBundle != null) {
-        player.timeline = Timeline.fromBundle(timelineBundle);
+        player.timeline = Timeline.CREATOR.fromBundle(timelineBundle);
       }
       player.currentMediaItemIndex =
           config.getInt(KEY_CURRENT_MEDIA_ITEM_INDEX, player.currentMediaItemIndex);
@@ -425,23 +425,25 @@ public class MediaSessionProviderService extends Service {
           config.getInt(KEY_CURRENT_PERIOD_INDEX, player.currentPeriodIndex);
       @Nullable Bundle playlistMetadataBundle = config.getBundle(KEY_PLAYLIST_METADATA);
       if (playlistMetadataBundle != null) {
-        player.playlistMetadata = MediaMetadata.fromBundle(playlistMetadataBundle);
+        player.playlistMetadata = MediaMetadata.CREATOR.fromBundle(playlistMetadataBundle);
       }
       @Nullable Bundle videoSizeBundle = config.getBundle(KEY_VIDEO_SIZE);
       if (videoSizeBundle != null) {
-        player.videoSize = VideoSize.fromBundle(videoSizeBundle);
+        player.videoSize = VideoSize.CREATOR.fromBundle(videoSizeBundle);
       }
       player.volume = config.getFloat(KEY_VOLUME, player.volume);
       @Nullable Bundle audioAttributesBundle = config.getBundle(KEY_AUDIO_ATTRIBUTES);
       if (audioAttributesBundle != null) {
-        player.audioAttributes = AudioAttributes.fromBundle(audioAttributesBundle);
+        player.audioAttributes = AudioAttributes.CREATOR.fromBundle(audioAttributesBundle);
       }
       Bundle cueGroupBundle = config.getBundle(KEY_CURRENT_CUE_GROUP);
       player.cueGroup =
-          cueGroupBundle == null ? CueGroup.EMPTY_TIME_ZERO : CueGroup.fromBundle(cueGroupBundle);
+          cueGroupBundle == null
+              ? CueGroup.EMPTY_TIME_ZERO
+              : CueGroup.CREATOR.fromBundle(cueGroupBundle);
       @Nullable Bundle deviceInfoBundle = config.getBundle(KEY_DEVICE_INFO);
       if (deviceInfoBundle != null) {
-        player.deviceInfo = DeviceInfo.fromBundle(deviceInfoBundle);
+        player.deviceInfo = DeviceInfo.CREATOR.fromBundle(deviceInfoBundle);
       }
       player.deviceVolume = config.getInt(KEY_DEVICE_VOLUME, player.deviceVolume);
       player.deviceMuted = config.getBoolean(KEY_DEVICE_MUTED, player.deviceMuted);
@@ -459,13 +461,13 @@ public class MediaSessionProviderService extends Service {
           config.getLong(KEY_SEEK_FORWARD_INCREMENT_MS, player.seekForwardIncrementMs);
       @Nullable Bundle mediaMetadataBundle = config.getBundle(KEY_MEDIA_METADATA);
       if (mediaMetadataBundle != null) {
-        player.mediaMetadata = MediaMetadata.fromBundle(mediaMetadataBundle);
+        player.mediaMetadata = MediaMetadata.CREATOR.fromBundle(mediaMetadataBundle);
       }
       player.maxSeekToPreviousPositionMs =
           config.getLong(KEY_MAX_SEEK_TO_PREVIOUS_POSITION_MS, player.maxSeekToPreviousPositionMs);
       @Nullable Bundle currentTracksBundle = config.getBundle(KEY_CURRENT_TRACKS);
       if (currentTracksBundle != null) {
-        player.currentTracks = Tracks.fromBundle(currentTracksBundle);
+        player.currentTracks = Tracks.CREATOR.fromBundle(currentTracksBundle);
       }
       @Nullable
       Bundle trackSelectionParametersBundle = config.getBundle(KEY_TRACK_SELECTION_PARAMETERS);
@@ -475,7 +477,7 @@ public class MediaSessionProviderService extends Service {
       }
       @Nullable Bundle availableCommandsBundle = config.getBundle(KEY_AVAILABLE_COMMANDS);
       if (availableCommandsBundle != null) {
-        player.commands = Player.Commands.fromBundle(availableCommandsBundle);
+        player.commands = Player.Commands.CREATOR.fromBundle(availableCommandsBundle);
       }
       return player;
     }
@@ -486,7 +488,7 @@ public class MediaSessionProviderService extends Service {
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
-            session.broadcastCustomCommand(SessionCommand.fromBundle(command), args);
+            session.broadcastCustomCommand(SessionCommand.CREATOR.fromBundle(command), args);
           });
     }
 
@@ -504,7 +506,7 @@ public class MediaSessionProviderService extends Service {
                   "No connected controllers to receive custom command. sessionId=" + sessionId);
             }
             for (ControllerInfo info : controllerInfos) {
-              session.sendCustomCommand(info, SessionCommand.fromBundle(command), args);
+              session.sendCustomCommand(info, SessionCommand.CREATOR.fromBundle(command), args);
             }
           });
     }
@@ -533,8 +535,8 @@ public class MediaSessionProviderService extends Service {
             for (ControllerInfo info : controllerInfos) {
               session.setAvailableCommands(
                   info,
-                  SessionCommands.fromBundle(sessionCommands),
-                  Player.Commands.fromBundle(playerCommands));
+                  SessionCommands.CREATOR.fromBundle(sessionCommands),
+                  Player.Commands.CREATOR.fromBundle(playerCommands));
             }
           });
     }
@@ -549,7 +551,7 @@ public class MediaSessionProviderService extends Service {
           () -> {
             ImmutableList.Builder<CommandButton> builder = new ImmutableList.Builder<>();
             for (Bundle bundle : layout) {
-              builder.add(CommandButton.fromBundle(bundle));
+              builder.add(CommandButton.CREATOR.fromBundle(bundle));
             }
             MediaSession session = sessionMap.get(sessionId);
             session.setCustomLayout(builder.build());
@@ -600,7 +602,7 @@ public class MediaSessionProviderService extends Service {
             PlaybackException playerError =
                 playerErrorBundle == null
                     ? player.playerError
-                    : PlaybackException.fromBundle(playerErrorBundle);
+                    : PlaybackException.CREATOR.fromBundle(playerErrorBundle);
             player.notifyPlayerError(playerError);
           });
     }
@@ -725,7 +727,7 @@ public class MediaSessionProviderService extends Service {
     public void setPlaybackParameters(String sessionId, Bundle playbackParametersBundle)
         throws RemoteException {
       PlaybackParameters playbackParameters =
-          PlaybackParameters.fromBundle(playbackParametersBundle);
+          PlaybackParameters.CREATOR.fromBundle(playbackParametersBundle);
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
@@ -851,8 +853,8 @@ public class MediaSessionProviderService extends Service {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
             player.notifyPositionDiscontinuity(
-                PositionInfo.fromBundle(oldPositionBundle),
-                PositionInfo.fromBundle(newPositionBundle),
+                PositionInfo.CREATOR.fromBundle(oldPositionBundle),
+                PositionInfo.CREATOR.fromBundle(newPositionBundle),
                 reason);
           });
     }
@@ -865,7 +867,7 @@ public class MediaSessionProviderService extends Service {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
             player.notifyPlaybackParametersChanged(
-                PlaybackParameters.fromBundle(playbackParametersBundle));
+                PlaybackParameters.CREATOR.fromBundle(playbackParametersBundle));
           });
     }
 
@@ -888,7 +890,7 @@ public class MediaSessionProviderService extends Service {
     @Override
     public void notifyAudioAttributesChanged(String sessionId, Bundle audioAttributesBundle)
         throws RemoteException {
-      AudioAttributes audioAttributes = AudioAttributes.fromBundle(audioAttributesBundle);
+      AudioAttributes audioAttributes = AudioAttributes.CREATOR.fromBundle(audioAttributesBundle);
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
@@ -908,7 +910,7 @@ public class MediaSessionProviderService extends Service {
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
-            player.timeline = Timeline.fromBundle(timelineBundle);
+            player.timeline = Timeline.CREATOR.fromBundle(timelineBundle);
             List<MediaItem> mediaItems = new ArrayList<>();
             for (int i = 0; i < player.timeline.getWindowCount(); i++) {
               mediaItems.add(
@@ -943,7 +945,7 @@ public class MediaSessionProviderService extends Service {
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
-            player.mediaMetadata = MediaMetadata.fromBundle(metadataBundle);
+            player.mediaMetadata = MediaMetadata.CREATOR.fromBundle(metadataBundle);
           });
     }
 
@@ -954,7 +956,7 @@ public class MediaSessionProviderService extends Service {
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
-            player.playlistMetadata = MediaMetadata.fromBundle(playlistMetadataBundle);
+            player.playlistMetadata = MediaMetadata.CREATOR.fromBundle(playlistMetadataBundle);
           });
     }
 
@@ -1020,7 +1022,7 @@ public class MediaSessionProviderService extends Service {
             player.notifyAvailableCommandsChanged(
                 commandsBundle == null
                     ? Player.Commands.EMPTY
-                    : Player.Commands.fromBundle(commandsBundle));
+                    : Player.Commands.CREATOR.fromBundle(commandsBundle));
           });
     }
 
@@ -1095,7 +1097,7 @@ public class MediaSessionProviderService extends Service {
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
-            VideoSize videoSizeObj = VideoSize.fromBundle(videoSize);
+            VideoSize videoSizeObj = VideoSize.CREATOR.fromBundle(videoSize);
             player.notifyVideoSizeChanged(videoSizeObj);
           });
     }
@@ -1132,7 +1134,7 @@ public class MediaSessionProviderService extends Service {
 
     @Override
     public void notifyCuesChanged(String sessionId, Bundle cueGroupBundle) throws RemoteException {
-      CueGroup cueGroup = CueGroup.fromBundle(cueGroupBundle);
+      CueGroup cueGroup = CueGroup.CREATOR.fromBundle(cueGroupBundle);
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
@@ -1145,7 +1147,7 @@ public class MediaSessionProviderService extends Service {
     @Override
     public void notifyDeviceInfoChanged(String sessionId, Bundle deviceInfoBundle)
         throws RemoteException {
-      DeviceInfo deviceInfo = DeviceInfo.fromBundle(deviceInfoBundle);
+      DeviceInfo deviceInfo = DeviceInfo.CREATOR.fromBundle(deviceInfoBundle);
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
@@ -1158,7 +1160,7 @@ public class MediaSessionProviderService extends Service {
     @Override
     public void notifyMediaMetadataChanged(String sessionId, Bundle mediaMetadataBundle)
         throws RemoteException {
-      MediaMetadata mediaMetadata = MediaMetadata.fromBundle(mediaMetadataBundle);
+      MediaMetadata mediaMetadata = MediaMetadata.CREATOR.fromBundle(mediaMetadataBundle);
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
@@ -1205,7 +1207,7 @@ public class MediaSessionProviderService extends Service {
 
     @Override
     public void notifyTracksChanged(String sessionId, Bundle tracksBundle) throws RemoteException {
-      Tracks tracks = Tracks.fromBundle(tracksBundle);
+      Tracks tracks = Tracks.CREATOR.fromBundle(tracksBundle);
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);

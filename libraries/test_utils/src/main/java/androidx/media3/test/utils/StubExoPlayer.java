@@ -34,7 +34,6 @@ import androidx.media3.exoplayer.Renderer;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.analytics.AnalyticsCollector;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
-import androidx.media3.exoplayer.image.ImageOutput;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ShuffleOrder;
 import androidx.media3.exoplayer.source.TrackGroupArray;
@@ -55,7 +54,6 @@ public class StubExoPlayer extends StubPlayer implements ExoPlayer {
    * @deprecated Use {@link ExoPlayer}, as the {@link AudioComponent} methods are defined by that
    *     interface.
    */
-  @SuppressWarnings("deprecation") // Returning deprecated type
   @Override
   @Deprecated
   public AudioComponent getAudioComponent() {
@@ -66,7 +64,6 @@ public class StubExoPlayer extends StubPlayer implements ExoPlayer {
    * @deprecated Use {@link ExoPlayer}, as the {@link VideoComponent} methods are defined by that
    *     interface.
    */
-  @SuppressWarnings("deprecation") // Returning deprecated type
   @Override
   @Deprecated
   public VideoComponent getVideoComponent() {
@@ -77,7 +74,6 @@ public class StubExoPlayer extends StubPlayer implements ExoPlayer {
    * @deprecated Use {@link Player}, as the {@link TextComponent} methods are defined by that
    *     interface.
    */
-  @SuppressWarnings("deprecation") // Returning deprecated type
   @Override
   @Deprecated
   public TextComponent getTextComponent() {
@@ -88,7 +84,6 @@ public class StubExoPlayer extends StubPlayer implements ExoPlayer {
    * @deprecated Use {@link Player}, as the {@link DeviceComponent} methods are defined by that
    *     interface.
    */
-  @SuppressWarnings("deprecation") // Returning deprecated type
   @Override
   @Deprecated
   public DeviceComponent getDeviceComponent() {
@@ -409,11 +404,6 @@ public class StubExoPlayer extends StubPlayer implements ExoPlayer {
 
   @Override
   public boolean isTunnelingEnabled() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void setImageOutput(ImageOutput imageOutput) {
     throw new UnsupportedOperationException();
   }
 }

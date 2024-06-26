@@ -64,13 +64,11 @@ public final class CapturingImageOutput implements Dumpable, ImageOutput {
 
   @Override
   public void dump(Dumper dumper) {
-    if (imageCount > 0) {
-      dumper.startBlock("ImageOutput");
-      dumper.add("rendered image count", imageCount);
-      for (Dumpable dumpable : renderedBitmaps) {
-        dumpable.dump(dumper);
-      }
-      dumper.endBlock();
+    dumper.startBlock("ImageOutput");
+    dumper.add("rendered image count", imageCount);
+    for (Dumpable dumpable : renderedBitmaps) {
+      dumpable.dump(dumper);
     }
+    dumper.endBlock();
   }
 }

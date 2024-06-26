@@ -283,8 +283,8 @@ sample:
   presentationTimeUs = 998458
 sample:
   trackType = audio
-  dataHashCode = -1268670079
-  size = 180
+  dataHashCode = 799574529
+  size = 176
   isKeyFrame = true
   presentationTimeUs = 1000000
 sample:

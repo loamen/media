@@ -189,17 +189,10 @@ import com.google.common.base.Objects;
     return bundle;
   }
 
-  /**
-   * Object that can restore {@link SessionTokenImplLegacy} from a {@link Bundle}.
-   *
-   * @deprecated Use {@link #fromBundle} instead.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation") // Deprecated instance of deprecated class
+  /** Object that can restore {@link SessionTokenImplLegacy} from a {@link Bundle}. */
   public static final Creator<SessionTokenImplLegacy> CREATOR = SessionTokenImplLegacy::fromBundle;
 
-  /** Restores a {@code SessionTokenImplLegacy} from a {@link Bundle}. */
-  public static SessionTokenImplLegacy fromBundle(Bundle bundle) {
+  private static SessionTokenImplLegacy fromBundle(Bundle bundle) {
     @Nullable Bundle legacyTokenBundle = bundle.getBundle(FIELD_LEGACY_TOKEN);
     @Nullable
     MediaSessionCompat.Token legacyToken =

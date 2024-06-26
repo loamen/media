@@ -23,7 +23,6 @@ import android.os.Parcelable;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
-import androidx.media3.common.MimeTypes;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
@@ -62,7 +61,7 @@ public final class DownloadRequest implements Parcelable {
     /** Sets the {@link DownloadRequest#mimeType}. */
     @CanIgnoreReturnValue
     public Builder setMimeType(@Nullable String mimeType) {
-      this.mimeType = MimeTypes.normalizeMimeType(mimeType);
+      this.mimeType = mimeType;
       return this;
     }
 

@@ -28,6 +28,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.robolectric.Shadows.shadowOf;
 
+import android.net.Uri;
 import android.os.Looper;
 import android.util.Pair;
 import androidx.annotation.Nullable;
@@ -76,7 +77,7 @@ public final class MediaPeriodQueueTest {
   private static final long FIRST_AD_START_TIME_US = 10 * C.MICROS_PER_SECOND;
   private static final long SECOND_AD_START_TIME_US = 20 * C.MICROS_PER_SECOND;
 
-  private static final MediaItem AD_MEDIA_ITEM = MediaItem.fromUri("https://google.com/empty");
+  private static final Uri AD_URI = Uri.parse("https://google.com/empty");
   private static final Timeline CONTENT_TIMELINE =
       new SinglePeriodTimeline(
           CONTENT_DURATION_US,
@@ -84,7 +85,7 @@ public final class MediaPeriodQueueTest {
           /* isDynamic= */ false,
           /* useLiveConfiguration= */ false,
           /* manifest= */ null,
-          AD_MEDIA_ITEM);
+          MediaItem.fromUri(AD_URI));
 
   private MediaPeriodQueue mediaPeriodQueue;
   private AdPlaybackState adPlaybackState;
@@ -105,23 +106,7 @@ public final class MediaPeriodQueueTest {
         Looper.getMainLooper());
     HandlerWrapper handler =
         Clock.DEFAULT.createHandler(Looper.getMainLooper(), /* callback= */ null);
-    mediaPeriodQueue =
-        new MediaPeriodQueue(
-            analyticsCollector,
-            handler,
-            (info, rendererPositionOffsetUs) ->
-                new MediaPeriodHolder(
-                    rendererCapabilities,
-                    rendererPositionOffsetUs,
-                    trackSelector,
-                    allocator,
-                    mediaSourceList,
-                    info,
-                    new TrackSelectorResult(
-                        new RendererConfiguration[0],
-                        new ExoTrackSelection[0],
-                        Tracks.EMPTY,
-                        /* info= */ null)));
+    mediaPeriodQueue = new MediaPeriodQueue(analyticsCollector, handler);
     mediaSourceList =
         new MediaSourceList(
             mock(MediaSourceList.MediaSourceListInfoRefreshListener.class),
@@ -1458,7 +1443,17 @@ public final class MediaPeriodQueueTest {
   }
 
   private void enqueueNext() {
-    mediaPeriodQueue.enqueueNextMediaPeriodHolder(getNextMediaPeriodInfo());
+    mediaPeriodQueue.enqueueNextMediaPeriodHolder(
+        rendererCapabilities,
+        trackSelector,
+        allocator,
+        mediaSourceList,
+        getNextMediaPeriodInfo(),
+        new TrackSelectorResult(
+            new RendererConfiguration[0],
+            new ExoTrackSelection[0],
+            Tracks.EMPTY,
+            /* info= */ null));
   }
 
   private void clear() {
@@ -1492,7 +1487,7 @@ public final class MediaPeriodQueueTest {
     adPlaybackState =
         adPlaybackState
             .withAdCount(adGroupIndex, /* adCount= */ 1)
-            .withAvailableAdMediaItem(adGroupIndex, /* adIndexInAdGroup= */ 0, AD_MEDIA_ITEM)
+            .withAvailableAdUri(adGroupIndex, /* adIndexInAdGroup= */ 0, AD_URI)
             .withAdDurationsUs(newDurations);
     updateTimeline();
   }

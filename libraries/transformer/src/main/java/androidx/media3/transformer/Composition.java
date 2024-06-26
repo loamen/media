@@ -56,12 +56,8 @@ public final class Composition {
      *
      * @see Builder#Builder(List)
      */
-    public Builder(EditedMediaItemSequence sequence, EditedMediaItemSequence... sequences) {
-      this(
-          new ImmutableList.Builder<EditedMediaItemSequence>()
-              .add(sequence)
-              .add(sequences)
-              .build());
+    public Builder(EditedMediaItemSequence... sequences) {
+      this(ImmutableList.copyOf(sequences));
     }
 
     /**
@@ -108,8 +104,6 @@ public final class Composition {
      * Sets the {@link Effects} to apply to the {@link Composition}.
      *
      * <p>The default value is {@link Effects#EMPTY}.
-     *
-     * <p>This only works with the {@code Presentation} effect.
      *
      * @param effects The {@link Composition} {@link Effects}.
      * @return This builder.
@@ -173,8 +167,7 @@ public final class Composition {
      * the audio tracks are transcoded by default. They are all transmuxed if {@code transmuxAudio}
      * is {@code true}. Transmuxed tracks must be compatible (typically, all the {@link MediaItem}
      * instances containing the track to transmux are concatenated in a single {@link
-     * EditedMediaItemSequence} and have the same sample format for that track). Any transcoding
-     * effects requested will be ignored.
+     * EditedMediaItemSequence} and have the same sample format for that track).
      *
      * <p>Requesting audio transmuxing and {@linkplain #experimentalSetForceAudioTrack(boolean)
      * forcing an audio track} are not allowed together because generating silence requires
@@ -201,8 +194,7 @@ public final class Composition {
      * the video tracks are transcoded by default. They are all transmuxed if {@code transmuxVideo}
      * is {@code true}. Transmuxed tracks must be compatible (typically, all the {@link MediaItem}
      * instances containing the track to transmux are concatenated in a single {@link
-     * EditedMediaItemSequence} and have the same sample format for that track). Any transcoding
-     * effects requested will be ignored.
+     * EditedMediaItemSequence} and have the same sample format for that track).
      *
      * @param transmuxVideo Whether to transmux the video tracks.
      * @return This builder.

@@ -28,7 +28,6 @@ import com.google.common.base.Ascii;
 /**
  * @deprecated Use {@link androidx.media3.extractor.metadata.vorbis.VorbisComment} instead.
  */
-@SuppressWarnings("deprecation") // Internal references to own class
 @Deprecated
 @UnstableApi
 public class VorbisComment implements Metadata.Entry {

@@ -140,25 +140,24 @@ public final class MediaBrowser extends MediaController {
       return this;
     }
 
-    // LINT.IfChange(build_async)
     /**
      * Builds a {@link MediaBrowser} asynchronously.
      *
      * <p>The browser instance can be obtained like the following example:
      *
      * <pre>{@code
-     * MediaBrowser.Builder builder = new MediaBrowser.Builder(context, sessionToken);
+     * MediaBrowser.Builder builder = ...;
      * ListenableFuture<MediaBrowser> future = builder.buildAsync();
      * future.addListener(() -> {
      *   try {
      *     MediaBrowser browser = future.get();
      *     // The session accepted the connection.
-     *   } catch (ExecutionException | InterruptedException e) {
+     *   } catch (ExecutionException e) {
      *     if (e.getCause() instanceof SecurityException) {
      *       // The session rejected the connection.
      *     }
      *   }
-     * }, ContextCompat.getMainExecutor(context));
+     * }, ContextCompat.getMainExecutor());
      * }</pre>
      *
      * <p>The future must be kept by callers until the future is complete to get the controller

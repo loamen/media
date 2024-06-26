@@ -41,7 +41,7 @@ public final class TrackGroupArrayTest {
     TrackGroupArray trackGroupArrayToBundle = new TrackGroupArray(trackGroup1, trackGroup2);
 
     TrackGroupArray trackGroupArrayFromBundle =
-        TrackGroupArray.fromBundle(trackGroupArrayToBundle.toBundle());
+        TrackGroupArray.CREATOR.fromBundle(trackGroupArrayToBundle.toBundle());
 
     assertThat(trackGroupArrayFromBundle).isEqualTo(trackGroupArrayToBundle);
   }

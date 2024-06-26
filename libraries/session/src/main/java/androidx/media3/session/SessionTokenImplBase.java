@@ -232,17 +232,10 @@ import com.google.common.base.Objects;
     return bundle;
   }
 
-  /**
-   * Object that can restore {@link SessionTokenImplBase} from a {@link Bundle}.
-   *
-   * @deprecated Use {@link #fromBundle} instead.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation") // Deprecated instance of deprecated class
+  /** Object that can restore {@link SessionTokenImplBase} from a {@link Bundle}. */
   public static final Creator<SessionTokenImplBase> CREATOR = SessionTokenImplBase::fromBundle;
 
-  /** Restores a {@code SessionTokenImplBase} from a {@link Bundle}. */
-  public static SessionTokenImplBase fromBundle(Bundle bundle) {
+  private static SessionTokenImplBase fromBundle(Bundle bundle) {
     checkArgument(bundle.containsKey(FIELD_UID), "uid should be set.");
     int uid = bundle.getInt(FIELD_UID);
     checkArgument(bundle.containsKey(FIELD_TYPE), "type should be set.");

@@ -221,9 +221,8 @@ public class TransformerMixedInputEndToEndTest {
         .build();
   }
 
-  private static Composition buildComposition(
-      EditedMediaItem editedMediaItem, EditedMediaItem... editedMediaItems) {
-    return new Composition.Builder(new EditedMediaItemSequence(editedMediaItem, editedMediaItems))
+  private static Composition buildComposition(EditedMediaItem... editedMediaItems) {
+    return new Composition.Builder(new EditedMediaItemSequence(editedMediaItems))
         .setEffects(
             new Effects(
                 /* audioProcessors= */ ImmutableList.of(),

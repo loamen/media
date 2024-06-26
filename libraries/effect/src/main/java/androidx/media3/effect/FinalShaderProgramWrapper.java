@@ -155,7 +155,11 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   @Override
   public void setInputListener(InputListener inputListener) {
     this.inputListener = inputListener;
-    for (int i = 0; i < getInputCapacity(); i++) {
+    int inputCapacity =
+        textureOutputListener == null
+            ? SURFACE_INPUT_CAPACITY
+            : outputTexturePool.freeTextureCount();
+    for (int i = 0; i < inputCapacity; i++) {
       inputListener.onReadyToAcceptInputFrame();
     }
   }
@@ -250,33 +254,18 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public void flush() {
-    // The downstream consumer must already have been flushed, so the textureOutputListener
-    // implementation does not access its previously output textures, per its contract. However, the
-    // downstream consumer may not have called releaseOutputTexture on all these textures. Release
-    // all output textures that aren't already released.
-    if (textureOutputListener != null) {
-      outputTexturePool.freeAllTextures();
-      outputTextureTimestamps.clear();
-      syncObjects.clear();
-    }
-
     // Drops all frames that aren't rendered yet.
     availableFrames.clear();
     if (defaultShaderProgram != null) {
       defaultShaderProgram.flush();
     }
-
-    // Signal flush upstream.
     inputListener.onFlush();
-    for (int i = 0; i < getInputCapacity(); i++) {
+    if (textureOutputListener == null) {
+      // TODO: b/293572152 - Add texture output flush() support, propagating the flush() signal to
+      // downstream components so that they can release TexturePool resources and FinalWrapper can
+      // call onReadyToAcceptInputFrame().
       inputListener.onReadyToAcceptInputFrame();
     }
-  }
-
-  private int getInputCapacity() {
-    return textureOutputListener == null
-        ? SURFACE_INPUT_CAPACITY
-        : outputTexturePool.freeTextureCount();
   }
 
   @Override

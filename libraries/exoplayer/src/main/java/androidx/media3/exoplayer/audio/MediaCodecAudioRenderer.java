@@ -120,7 +120,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   private boolean audioSinkNeedsReset;
 
   @Nullable private WakeupListener wakeupListener;
-  private boolean hasPendingReportedSkippedSilence;
 
   /**
    * @param context A context.
@@ -147,15 +146,21 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
         mediaCodecSelector,
         eventHandler,
         eventListener,
-        new DefaultAudioSink.Builder(context).build());
+        AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES);
   }
 
   /**
-   * @deprecated Use a constructor without {@link AudioCapabilities}. These are obtained
-   *     automatically from the {@link Context}.
+   * @param context A context.
+   * @param mediaCodecSelector A decoder selector.
+   * @param eventHandler A handler to use when delivering events to {@code eventListener}. May be
+   *     null if delivery of events is not required.
+   * @param eventListener A listener of events. May be null if delivery of events is not required.
+   * @param audioCapabilities The audio capabilities for playback on this device. Use {@link
+   *     AudioCapabilities#DEFAULT_AUDIO_CAPABILITIES} if default capabilities (no encoded audio
+   *     passthrough support) should be assumed.
+   * @param audioProcessors Optional {@link AudioProcessor}s that will process PCM audio before
+   *     output.
    */
-  @SuppressWarnings("deprecation") // Calling deprecated method for compatibility
-  @Deprecated
   public MediaCodecAudioRenderer(
       Context context,
       MediaCodecSelector mediaCodecSelector,
@@ -191,7 +196,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       AudioSink audioSink) {
     this(
         context,
-        MediaCodecAdapter.Factory.getDefault(context),
+        MediaCodecAdapter.Factory.DEFAULT,
         mediaCodecSelector,
         /* enableDecoderFallback= */ false,
         eventHandler,
@@ -219,7 +224,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       AudioSink audioSink) {
     this(
         context,
-        MediaCodecAdapter.Factory.getDefault(context),
+        MediaCodecAdapter.Factory.DEFAULT,
         mediaCodecSelector,
         enableDecoderFallback,
         eventHandler,
@@ -552,7 +557,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
               .setMetadata(format.metadata)
               .setId(format.id)
               .setLabel(format.label)
-              .setLabels(format.labels)
               .setLanguage(format.language)
               .setSelectionFlags(format.selectionFlags)
               .setRoleFlags(format.roleFlags)
@@ -616,7 +620,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     audioSink.flush();
 
     currentPositionUs = positionUs;
-    hasPendingReportedSkippedSilence = false;
     allowPositionDiscontinuity = true;
   }
 
@@ -650,7 +653,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
 
   @Override
   protected void onReset() {
-    hasPendingReportedSkippedSilence = false;
     try {
       super.onReset();
     } finally {
@@ -682,13 +684,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       updateCurrentPosition();
     }
     return currentPositionUs;
-  }
-
-  @Override
-  public boolean hasSkippedSilenceSinceLastCall() {
-    boolean hasPendingReportedSkippedSilence = this.hasPendingReportedSkippedSilence;
-    this.hasPendingReportedSkippedSilence = false;
-    return hasPendingReportedSkippedSilence;
   }
 
   @Override
@@ -744,13 +739,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       fullyConsumed = audioSink.handleBuffer(buffer, bufferPresentationTimeUs, sampleCount);
     } catch (InitializationException e) {
       throw createRendererException(
-          e,
-          inputFormat,
-          e.isRecoverable,
-          isBypassEnabled()
-                  && getConfiguration().offloadModePreferred != AudioSink.OFFLOAD_MODE_DISABLED
-              ? PlaybackException.ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED
-              : PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED);
+          e, inputFormat, e.isRecoverable, PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED);
     } catch (WriteException e) {
       throw createRendererException(
           e,
@@ -998,11 +987,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     @Override
     public void onPositionDiscontinuity() {
       MediaCodecAudioRenderer.this.onPositionDiscontinuity();
-    }
-
-    @Override
-    public void onSilenceSkipped() {
-      hasPendingReportedSkippedSilence = true;
     }
 
     @Override

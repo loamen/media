@@ -242,22 +242,15 @@ import com.google.common.base.Objects;
     return bundle;
   }
 
-  /**
-   * Object that can restore {@link SessionPositionInfo} from a {@link Bundle}.
-   *
-   * @deprecated Use {@link #fromBundle} instead.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation") // Deprecated instance of deprecated class
+  /** Object that can restore {@link SessionPositionInfo} from a {@link Bundle}. */
   public static final Creator<SessionPositionInfo> CREATOR = SessionPositionInfo::fromBundle;
 
-  /** Restores a {@code SessionPositionInfo} from a {@link Bundle}. */
-  public static SessionPositionInfo fromBundle(Bundle bundle) {
+  private static SessionPositionInfo fromBundle(Bundle bundle) {
     @Nullable Bundle positionInfoBundle = bundle.getBundle(FIELD_POSITION_INFO);
     PositionInfo positionInfo =
         positionInfoBundle == null
             ? DEFAULT_POSITION_INFO
-            : PositionInfo.fromBundle(positionInfoBundle);
+            : PositionInfo.CREATOR.fromBundle(positionInfoBundle);
     boolean isPlayingAd = bundle.getBoolean(FIELD_IS_PLAYING_AD, /* defaultValue= */ false);
     long eventTimeMs = bundle.getLong(FIELD_EVENT_TIME_MS, /* defaultValue= */ C.TIME_UNSET);
     long durationMs = bundle.getLong(FIELD_DURATION_MS, /* defaultValue= */ C.TIME_UNSET);

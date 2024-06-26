@@ -224,9 +224,6 @@ public class PlaybackException extends Exception implements Bundleable {
   /** Caused by an AudioTrack write operation failure in offload mode. */
   @UnstableApi public static final int ERROR_CODE_AUDIO_TRACK_OFFLOAD_WRITE_FAILED = 5003;
 
-  /** Caused by an AudioTrack write operation failure in offload mode. */
-  @UnstableApi public static final int ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED = 5004;
-
   // DRM errors (6xxx).
 
   /** Caused by an unspecified error related to DRM protection. */
@@ -333,8 +330,6 @@ public class PlaybackException extends Exception implements Bundleable {
         return "ERROR_CODE_AUDIO_TRACK_WRITE_FAILED";
       case ERROR_CODE_AUDIO_TRACK_OFFLOAD_WRITE_FAILED:
         return "ERROR_CODE_AUDIO_TRACK_OFFLOAD_WRITE_FAILED";
-      case ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED:
-        return "ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED";
       case ERROR_CODE_DRM_UNSPECIFIED:
         return "ERROR_CODE_DRM_UNSPECIFIED";
       case ERROR_CODE_DRM_SCHEME_UNSUPPORTED:
@@ -460,28 +455,15 @@ public class PlaybackException extends Exception implements Bundleable {
 
   /**
    * Defines a minimum field ID value for subclasses to use when implementing {@link #toBundle()}
-   * and delegating to {@link #PlaybackException(Bundle)}.
+   * and {@link Bundleable.Creator}.
    *
    * <p>Subclasses should obtain their {@link Bundle Bundle's} field keys by applying a non-negative
    * offset on this constant and passing the result to {@link Util#intToStringMaxRadix(int)}.
    */
   @UnstableApi protected static final int FIELD_CUSTOM_ID_BASE = 1000;
 
-  /**
-   * Object that can create a {@link PlaybackException} from a {@link Bundle}.
-   *
-   * @deprecated Use {@link #fromBundle} instead.
-   */
-  @UnstableApi
-  @Deprecated
-  @SuppressWarnings("deprecation") // Deprecated instance of deprecated class
-  public static final Creator<PlaybackException> CREATOR = PlaybackException::new;
-
-  /** Restores a {@code PlaybackException} from a {@link Bundle}. */
-  @UnstableApi
-  public static PlaybackException fromBundle(Bundle bundle) {
-    return new PlaybackException(bundle);
-  }
+  /** Object that can create a {@link PlaybackException} from a {@link Bundle}. */
+  @UnstableApi public static final Creator<PlaybackException> CREATOR = PlaybackException::new;
 
   @UnstableApi
   @CallSuper

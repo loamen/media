@@ -26,9 +26,7 @@ rootProject.allprojects.forEach {
 
 android {
     namespace 'androidx.media3.common'
-    defaultConfig {
-        minSdkVersion 16
-    }
+
     buildTypes {
         debug {
             testCoverageEnabled = true

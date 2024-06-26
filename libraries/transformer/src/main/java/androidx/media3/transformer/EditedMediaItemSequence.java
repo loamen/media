@@ -49,13 +49,8 @@ public final class EditedMediaItemSequence {
   public final boolean isLooping;
 
   /** Creates a {@linkplain #isLooping non-looping} instance. */
-  public EditedMediaItemSequence(
-      EditedMediaItem editedMediaItem, EditedMediaItem... editedMediaItems) {
-    this(
-        new ImmutableList.Builder<EditedMediaItem>()
-            .add(editedMediaItem)
-            .add(editedMediaItems)
-            .build());
+  public EditedMediaItemSequence(EditedMediaItem... editedMediaItems) {
+    this(ImmutableList.copyOf(editedMediaItems));
   }
 
   /** Creates a {@linkplain #isLooping non-looping} instance. */

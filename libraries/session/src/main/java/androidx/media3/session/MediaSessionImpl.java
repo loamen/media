@@ -39,7 +39,6 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.DeadObjectException;
@@ -54,11 +53,9 @@ import android.support.v4.media.session.MediaSessionCompat;
 import android.view.KeyEvent;
 import android.view.ViewConfiguration;
 import androidx.annotation.CheckResult;
-import androidx.annotation.DoNotInline;
 import androidx.annotation.FloatRange;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.media.MediaBrowserServiceCompat;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.DeviceInfo;
@@ -390,7 +387,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         && controllerInfo
             .getConnectionHints()
             .getBoolean(
-                MediaController.KEY_MEDIA_NOTIFICATION_CONTROLLER_FLAG, /* defaultValue= */ false);
+                MediaNotificationManager.KEY_MEDIA_NOTIFICATION_MANAGER, /* defaultValue= */ false);
   }
 
   /**
@@ -1126,16 +1123,14 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
     // Double tap detection.
     int keyCode = keyEvent.getKeyCode();
-    boolean isTvApp = Util.SDK_INT >= 21 && Api21.isTvApp(context);
     boolean doubleTapCompleted = false;
     switch (keyCode) {
       case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
       case KeyEvent.KEYCODE_HEADSETHOOK:
-        if (isTvApp
-            || callerInfo.getControllerVersion() != ControllerInfo.LEGACY_CONTROLLER_VERSION
+        if (callerInfo.getControllerVersion() != ControllerInfo.LEGACY_CONTROLLER_VERSION
             || keyEvent.getRepeatCount() != 0) {
-          // Double tap detection is only for mobile apps that receive a media button event from
-          // external sources (for instance Bluetooth) and excluding long press (repeatCount > 0).
+          // Double tap detection is only for media button events from external sources
+          // (for instance Bluetooth) and excluding long press (repeatCount > 0).
           mediaPlayPauseKeyHandler.flush();
         } else if (mediaPlayPauseKeyHandler.hasPendingPlayPauseTask()) {
           // A double tap arrived. Clear the pending playPause task.
@@ -1820,14 +1815,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       if (!hasMessages(MSG_PLAYER_INFO_CHANGED)) {
         sendEmptyMessage(MSG_PLAYER_INFO_CHANGED);
       }
-    }
-  }
-
-  @RequiresApi(21)
-  private static final class Api21 {
-    @DoNotInline
-    public static boolean isTvApp(Context context) {
-      return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
     }
   }
 }

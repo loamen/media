@@ -22,7 +22,6 @@ import android.os.Parcelable;
 import androidx.annotation.Nullable;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Metadata;
-import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.UnstableApi;
 import com.google.common.base.Charsets;
@@ -160,8 +159,7 @@ public final class PictureFrame implements Metadata.Entry {
   public static PictureFrame fromPictureBlock(ParsableByteArray pictureBlock) {
     int pictureType = pictureBlock.readInt();
     int mimeTypeLength = pictureBlock.readInt();
-    String mimeType =
-        MimeTypes.normalizeMimeType(pictureBlock.readString(mimeTypeLength, Charsets.US_ASCII));
+    String mimeType = pictureBlock.readString(mimeTypeLength, Charsets.US_ASCII);
     int descriptionLength = pictureBlock.readInt();
     String description = pictureBlock.readString(descriptionLength);
     int width = pictureBlock.readInt();

@@ -45,9 +45,7 @@ public final class EditedMediaItem {
      * Creates an instance.
      *
      * <p>For image inputs, the values passed into {@link #setRemoveAudio}, {@link #setRemoveVideo}
-     * and {@link #setFlattenForSlowMotion} will be ignored. For multi-picture formats (e.g. gifs),
-     * a single image frame from the container is displayed if the {@link DefaultAssetLoaderFactory}
-     * is used.
+     * and {@link #setFlattenForSlowMotion} will be ignored.
      *
      * @param mediaItem The {@link MediaItem} on which transformations are applied.
      */
@@ -137,15 +135,13 @@ public final class EditedMediaItem {
     /**
      * Sets the duration of the output video in microseconds.
      *
-     * <p>For an input that doesn't have an intrinsic duration (e.g. images), this should be the
-     * desired presentation duration. Otherwise, this should be the duration of the full content
-     * that the {@linkplain MediaItem.LocalConfiguration#uri media URI} resolves to, before {@link
-     * MediaItem#clippingConfiguration} is applied.
+     * <p>This should be set for inputs that don't have an implicit duration (e.g. images). It will
+     * be ignored for inputs that do have an implicit duration (e.g. video).
      *
      * <p>No duration is set by default.
      */
     @CanIgnoreReturnValue
-    public Builder setDurationUs(@IntRange(from = 1) long durationUs) {
+    public Builder setDurationUs(long durationUs) {
       checkArgument(durationUs > 0);
       this.durationUs = durationUs;
       return this;
@@ -237,11 +233,7 @@ public final class EditedMediaItem {
    */
   public final boolean flattenForSlowMotion;
 
-  /**
-   * The duration of the image in the output video for image {@link MediaItem}, or the media
-   * duration for other types of {@link MediaItem}, in microseconds.
-   */
-  // TODO - b/309767764: Consider merging with presentationDurationUs.
+  /** The duration of the image in the output video, in microseconds. */
   public final long durationUs;
 
   /** The frame rate of the image in the output video, in frames per second. */
@@ -250,9 +242,6 @@ public final class EditedMediaItem {
 
   /** The {@link Effects} to apply to the {@link #mediaItem}. */
   public final Effects effects;
-
-  /** The duration for which this {@code EditedMediaItem} should be presented, in microseconds. */
-  private long presentationDurationUs;
 
   private EditedMediaItem(
       MediaItem mediaItem,
@@ -270,32 +259,10 @@ public final class EditedMediaItem {
     this.durationUs = durationUs;
     this.frameRate = frameRate;
     this.effects = effects;
-    presentationDurationUs = C.TIME_UNSET;
   }
 
   /** Returns a {@link Builder} initialized with the values of this instance. */
   /* package */ Builder buildUpon() {
     return new Builder(this);
-  }
-
-  /* package */ long getPresentationDurationUs() {
-    if (presentationDurationUs == C.TIME_UNSET) {
-      if (mediaItem.clippingConfiguration.equals(MediaItem.ClippingConfiguration.UNSET)
-          || durationUs == C.TIME_UNSET) {
-        // TODO - b/290734981: Use presentationDurationUs for image presentation
-        presentationDurationUs = durationUs;
-      } else {
-        MediaItem.ClippingConfiguration clippingConfiguration = mediaItem.clippingConfiguration;
-        checkArgument(!clippingConfiguration.relativeToDefaultPosition);
-        if (clippingConfiguration.endPositionUs == C.TIME_END_OF_SOURCE) {
-          presentationDurationUs = durationUs - clippingConfiguration.startPositionUs;
-        } else {
-          checkArgument(clippingConfiguration.endPositionUs <= durationUs);
-          presentationDurationUs =
-              clippingConfiguration.endPositionUs - clippingConfiguration.startPositionUs;
-        }
-      }
-    }
-    return presentationDurationUs;
   }
 }

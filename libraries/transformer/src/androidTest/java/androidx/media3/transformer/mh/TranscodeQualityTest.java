@@ -17,7 +17,7 @@
 package androidx.media3.transformer.mh;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
 
 import android.content.Context;
 import android.net.Uri;
@@ -52,12 +52,9 @@ public final class TranscodeQualityTest {
         /* outputFormat= */ AndroidTestUtil.MP4_ASSET_WITH_INCREASING_TIMESTAMPS_FORMAT)) {
       return;
     }
-    // Skip on specific pre-API 34 devices where calculating SSIM fails.
-    assumeFalse(
-        (Util.SDK_INT < 33 && (Util.MODEL.equals("SM-F711U1") || Util.MODEL.equals("SM-F926U1")))
-            || (Util.SDK_INT == 33 && Util.MODEL.equals("LE2121")));
-    // Skip on specific API 21 devices that aren't able to decode and encode at this resolution.
-    assumeFalse(Util.SDK_INT == 21 && Util.MODEL.equals("Nexus 7"));
+    // TODO: b/239983127 - Remove this test skip on these devices.
+    assumeTrue(!Util.MODEL.equals("SM-F711U1") && !Util.MODEL.equals("SM-F926U1"));
+
     Transformer transformer =
         new Transformer.Builder(context)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
@@ -101,9 +98,9 @@ public final class TranscodeQualityTest {
             .build())) {
       return;
     }
-    assumeFalse(
-        (Util.SDK_INT < 33 && (Util.MODEL.equals("SM-F711U1") || Util.MODEL.equals("SM-F926U1")))
-            || (Util.SDK_INT == 33 && Util.MODEL.equals("LE2121")));
+    // TODO: b/239983127 - Remove this test skip on these devices.
+    assumeTrue(!Util.MODEL.equals("SM-F711U1") && !Util.MODEL.equals("SM-F926U1"));
+
     Transformer transformer =
         new Transformer.Builder(context).setVideoMimeType(MimeTypes.VIDEO_H265).build();
     MediaItem mediaItem =
@@ -128,9 +125,8 @@ public final class TranscodeQualityTest {
     Context context = ApplicationProvider.getApplicationContext();
     String testId = "transcodeAvcToAvc320x240_ssim";
 
-    // Don't skip based on format support as input and output formats should be within CDD
-    // requirements on all supported API versions, except for wearable devices.
-    assumeFalse(Util.isWear(context));
+    // Note: We never skip this test as the input and output formats should be within CDD
+    // requirements on all supported API versions.
 
     Transformer transformer =
         new Transformer.Builder(context)
