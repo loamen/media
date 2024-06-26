@@ -17,7 +17,9 @@ android.buildTypes.debug.testCoverageEnabled true
 
 android {
     namespace 'androidx.media3.ui'
-
+    defaultConfig {
+        minSdkVersion 16
+    }
     lint {
         baseline = file("lint-baseline.xml")
     }

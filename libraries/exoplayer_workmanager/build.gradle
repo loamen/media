@@ -17,7 +17,9 @@ apply from: "$gradle.ext.androidxMediaSettingsDir/common_library_config.gradle"
 
 android {
     namespace 'androidx.media3.exoplayer.workmanager'
-
+    defaultConfig {
+        minSdkVersion 16
+    }
     publishing {
         singleVariant('release') {
             withSourcesJar()

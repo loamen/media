@@ -15,7 +15,9 @@ apply from: "$gradle.ext.androidxMediaSettingsDir/common_library_config.gradle"
 
 android {
     namespace 'androidx.media3.test.utils'
-
+    defaultConfig {
+        minSdkVersion 16
+    }
     sourceSets {
         test.assets.srcDir '../test_data/src/test/assets/'
     }
