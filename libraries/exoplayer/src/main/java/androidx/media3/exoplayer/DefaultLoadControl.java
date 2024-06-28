@@ -103,11 +103,6 @@ public class DefaultLoadControl implements LoadControl {
    */
   public static final int DEFAULT_MIN_BUFFER_SIZE = 200 * C.DEFAULT_BUFFER_SEGMENT_SIZE;
 
-  public DefaultLoadControl(int buffer) {
-    this();
-    targetBufferBytes = buffer;
-  }
-
   /** Builder for {@link DefaultLoadControl}. */
   public static final class Builder {
 
